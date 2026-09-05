@@ -1,0 +1,88 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum RegistrationStatus {
+  ACTIVE
+  CANCELLED
+}
+
+model Organizer {
+  id                     String  @id @default(uuid()) @db.Uuid
+  username               String? @unique
+  email                  String  @unique
+  passwordHash           String?
+  authProvider           String?
+  passwordResetTokenHash String? @unique
+  passwordResetExpiresAt DateTime?
+  sessionVersion         Int     @default(0)
+  events                 Event[]
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model Participant {
+  id                     String  @id @default(uuid()) @db.Uuid
+  username               String  @unique
+  name                   String
+  email                  String  @unique
+  passwordHash           String
+  authProvider           String?
+  passwordResetTokenHash String? @unique
+  passwordResetExpiresAt DateTime?
+  sessionVersion         Int     @default(0)
+  registrations          Registration[]
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+}
+
+model Event {
+  id          String        @id @default(uuid()) @db.Uuid
+  organizerId String        @db.Uuid
+  organizer   Organizer     @relation(fields: [organizerId], references: [id], onDelete: Restrict)
+  name        String
+  date        DateTime
+  location    String
+  capacity    Int
+  status      EventStatus   @default(DRAFT)
+  publicId    String        @unique @default(cuid())
+  registrations Registration[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  publishedAt DateTime?
+
+  @@index([organizerId])
+}
+
+model Registration {
+  id                String             @id @default(uuid()) @db.Uuid
+  eventId           String             @db.Uuid
+  event             Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  participantId     String?            @db.Uuid
+  participant       Participant?       @relation(fields: [participantId], references: [id], onDelete: SetNull)
+  participantName   String
+  participantEmail  String
+  participantPhone  String?
+  status            RegistrationStatus @default(ACTIVE)
+  confirmationCode  String?            @unique
+  cancellationToken String?            @unique
+  createdAt         DateTime           @default(now())
+  cancelledAt       DateTime?
+  checkedInAt       DateTime?
+
+  @@index([eventId])
+  @@index([participantId])
+  @@index([status])
+  @@index([eventId, participantEmail, status])
+}

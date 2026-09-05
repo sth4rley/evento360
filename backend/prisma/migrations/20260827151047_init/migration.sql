@@ -1,0 +1,2 @@
+-- The initial schema is created by 20260827100000_init. This migration is
+-- intentionally retained as a no-op to preserve the existing migration history.

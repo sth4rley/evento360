@@ -1,0 +1,52 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-evento360}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD no .env}
+      POSTGRES_DB: ${POSTGRES_DB:-evento360}
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - evento360-postgres:/var/lib/postgresql/data
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5678:5678"
+    environment:
+      N8N_HOST: localhost
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      N8N_EDITOR_BASE_URL: http://localhost:5678
+      N8N_WEBHOOK_URL: http://localhost:5678/
+      GENERIC_TIMEZONE: America/Sao_Paulo
+      TZ: America/Sao_Paulo
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
+    volumes:
+      - evento360-n8n:/home/node/.n8n
+
+  waha:
+    image: devlikeapro/waha:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      WAHA_API_KEY: sha512:${WAHA_API_KEY_SHA512}
+      WAHA_DASHBOARD_ENABLED: "true"
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+      WHATSAPP_SWAGGER_ENABLED: "true"
+      WHATSAPP_SWAGGER_USERNAME: ${WAHA_DASHBOARD_USERNAME}
+      WHATSAPP_SWAGGER_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+      WHATSAPP_DEFAULT_ENGINE: GOWS
+      TZ: America/Sao_Paulo
+    volumes:
+      - evento360-waha-sessions:/app/.sessions
+
+volumes:
+  evento360-postgres:
+  evento360-n8n:
+  evento360-waha-sessions:
