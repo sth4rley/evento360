@@ -1,0 +1,30 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+
+      - name: Install Dependencies
+        run: cd backend && npm ci
+
+      - name: Generate Prisma Client
+        run: cd backend && npx prisma generate
+
+      - name: Run Tests
+        run: cd backend && npx vitest run
+        env:
+          # Variável de ambiente fake apenas para passar nos testes
+          RESEND_API_KEY: re_dummy_key_for_ci_tests_123

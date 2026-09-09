@@ -6,6 +6,7 @@ import type { CreatedRegistration } from "../src/domain/registrations.js";
 vi.mock("../src/services/resend.js", () => ({
   buildRegistrationConfirmationEmail: vi.fn(),
   sendRegistrationConfirmationEmail: vi.fn(),
+  sendTicketEmail: vi.fn().mockResolvedValue({ success: true }),
 }));
 
 vi.mock("../src/services/n8n.js", () => ({
@@ -24,7 +25,9 @@ const sendEmailMock = vi.mocked(sendRegistrationConfirmationEmail);
 const sendWebhookMock = vi.mocked(sendRegistrationCreatedWebhook);
 
 async function removeTestData() {
-  await prisma.event.deleteMany({ where: { organizer: { email: organizerEmail } } });
+  await prisma.event.deleteMany({
+    where: { organizer: { email: organizerEmail } },
+  });
   await prisma.organizer.deleteMany({ where: { email: organizerEmail } });
 }
 
@@ -50,15 +53,19 @@ async function createPublishedEvent() {
 }
 
 function register(publicId: string, input: Record<string, unknown> = {}) {
-  return request(app).post(`/api/public/events/${publicId}/registrations`).send({
-    participantName: "Participante Integrações",
-    participantEmail,
-    participantPhone: "+55 41 99999-0000",
-    ...input,
-  });
+  return request(app)
+    .post(`/api/public/events/${publicId}/registrations`)
+    .send({
+      participantName: "Participante Integrações",
+      participantEmail,
+      participantPhone: "+55 41 99999-0000",
+      ...input,
+    });
 }
 
-async function expectRegistrationAlreadyPersisted(created: CreatedRegistration) {
+async function expectRegistrationAlreadyPersisted(
+  created: CreatedRegistration,
+) {
   const persisted = await prisma.registration.findUnique({
     where: { id: created.registration.id },
     select: {
@@ -133,7 +140,9 @@ describe("registration external integrations", () => {
   it("does not notify either integration when registration validation fails", async () => {
     const event = await createPublishedEvent();
 
-    const response = await register(event.publicId, { participantEmail: "invalid-email" });
+    const response = await register(event.publicId, {
+      participantEmail: "invalid-email",
+    });
 
     expect(response.status).toBe(400);
     expect(response.body.error.code).toBe("VALIDATION_ERROR");
@@ -149,7 +158,9 @@ describe("registration external integrations", () => {
     async (failingIntegration) => {
       const event = await createPublishedEvent();
       const secretMarker = `${failingIntegration}-secret-must-not-be-logged`;
-      const errorLog = vi.spyOn(console, "error").mockImplementation(() => undefined);
+      const errorLog = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => undefined);
 
       if (failingIntegration === "resend") {
         sendEmailMock.mockImplementationOnce(async (created) => {
@@ -181,7 +192,9 @@ describe("registration external integrations", () => {
       expect(errorLog).toHaveBeenCalled();
       const serializedLog = JSON.stringify(errorLog.mock.calls);
       expect(serializedLog).not.toContain(secretMarker);
-      expect(serializedLog).not.toContain(response.body.registration.cancellationToken);
+      expect(serializedLog).not.toContain(
+        response.body.registration.cancellationToken,
+      );
 
       errorLog.mockRestore();
     },

@@ -19,7 +19,10 @@ const resendEnvironment = vi.hoisted(() => {
 
 import {
   buildRegistrationConfirmationEmail,
+  buildTicketEmailHtml,
+  resend,
   sendRegistrationConfirmationEmail,
+  sendTicketEmail,
 } from "../src/services/resend.js";
 
 const created: CreatedRegistration = {
@@ -43,7 +46,10 @@ const created: CreatedRegistration = {
   },
 };
 
-function restoreEnvironmentVariable(name: string, previous: string | undefined) {
+function restoreEnvironmentVariable(
+  name: string,
+  previous: string | undefined,
+) {
   if (previous === undefined) {
     delete process.env[name];
   } else {
@@ -65,9 +71,18 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  restoreEnvironmentVariable("RESEND_API_KEY", resendEnvironment.previous.apiKey);
-  restoreEnvironmentVariable("RESEND_FROM_EMAIL", resendEnvironment.previous.fromEmail);
-  restoreEnvironmentVariable("PUBLIC_APP_URL", resendEnvironment.previous.publicAppUrl);
+  restoreEnvironmentVariable(
+    "RESEND_API_KEY",
+    resendEnvironment.previous.apiKey,
+  );
+  restoreEnvironmentVariable(
+    "RESEND_FROM_EMAIL",
+    resendEnvironment.previous.fromEmail,
+  );
+  restoreEnvironmentVariable(
+    "PUBLIC_APP_URL",
+    resendEnvironment.previous.publicAppUrl,
+  );
 });
 
 describe("Resend registration confirmation", () => {
@@ -91,7 +106,9 @@ describe("Resend registration confirmation", () => {
     expect(html).toContain("Ver minha inscrição");
     expect(html).toContain("Cancelar inscrição");
     expect(html.split(created.registration.cancellationToken)).toHaveLength(2);
-    expect(visibleText(html)).not.toContain(created.registration.cancellationToken);
+    expect(visibleText(html)).not.toContain(
+      created.registration.cancellationToken,
+    );
   });
 
   it("sends the rendered e-mail through a mocked Resend request", async () => {
@@ -118,7 +135,9 @@ describe("Resend registration confirmation", () => {
     expect(requestInit?.method).toBe("POST");
     expect(requestInit?.redirect).toBe("error");
     expect(requestInit?.signal).toBeInstanceOf(AbortSignal);
-    expect(headers.get("Authorization")).toBe(`Bearer ${resendEnvironment.apiKey}`);
+    expect(headers.get("Authorization")).toBe(
+      `Bearer ${resendEnvironment.apiKey}`,
+    );
     expect(headers.get("Content-Type")).toBe("application/json");
     expect(body).toMatchObject({
       from: resendEnvironment.fromEmail,
@@ -132,5 +151,103 @@ describe("Resend registration confirmation", () => {
       `${resendEnvironment.publicAppUrl}/registration/cancel/${created.registration.cancellationToken}`,
     );
     expect(resendResponse.bodyUsed).toBe(true);
+  });
+});
+
+describe("sendTicketEmail and ticket template", () => {
+  const ticketData = {
+    to: "participante@example.test",
+    participantName: "Carlos Oliveira",
+    eventName: "Conferência IA 2026",
+    ticketCode: "TICKET-IA-2026",
+    qrCode: "https://example.test/qrcode/TICKET-IA-2026.png",
+  };
+
+  it("builds the ticket HTML containing participant name, event name, ticket code and QR code image tag", () => {
+    const html = buildTicketEmailHtml(
+      ticketData.participantName,
+      ticketData.eventName,
+      ticketData.ticketCode,
+      ticketData.qrCode,
+    );
+
+    expect(html).toContain(ticketData.participantName);
+    expect(html).toContain(ticketData.eventName);
+    expect(html).toContain(ticketData.ticketCode);
+    expect(html).toContain(`<img src="${ticketData.qrCode}"`);
+    expect(html).toContain("chatbot");
+  });
+
+  it("sends ticket email successfully through resend.emails.send", async () => {
+    const sendSpy = vi.spyOn(resend.emails, "send").mockResolvedValue({
+      data: { id: "resend-ticket-email-id" },
+      error: null,
+    } as any);
+
+    const result = await sendTicketEmail(
+      ticketData.to,
+      ticketData.participantName,
+      ticketData.eventName,
+      ticketData.ticketCode,
+      ticketData.qrCode,
+    );
+
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ id: "resend-ticket-email-id" });
+    expect(sendSpy).toHaveBeenCalledOnce();
+    const callArg = sendSpy.mock.calls[0][0];
+    expect(callArg.to).toBe(ticketData.to);
+    expect(callArg.subject).toContain(ticketData.eventName);
+    expect(callArg.subject).toContain(ticketData.ticketCode);
+    expect(callArg.html).toContain(`<img src="${ticketData.qrCode}"`);
+  });
+
+  it("supports passing payload as an object", async () => {
+    const sendSpy = vi.spyOn(resend.emails, "send").mockResolvedValue({
+      data: { id: "resend-ticket-object-id" },
+      error: null,
+    } as any);
+
+    const result = await sendTicketEmail(ticketData);
+
+    expect(result.success).toBe(true);
+    expect(result.data).toEqual({ id: "resend-ticket-object-id" });
+    expect(sendSpy).toHaveBeenCalledOnce();
+  });
+
+  it("handles Resend API error and logs to console.error", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(resend.emails, "send").mockResolvedValue({
+      data: null,
+      error: { name: "validation_error", message: "Invalid domain" },
+    } as any);
+
+    const result = await sendTicketEmail(ticketData);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toEqual({
+      name: "validation_error",
+      message: "Invalid domain",
+    });
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Falha na API do Resend"),
+      expect.anything(),
+    );
+  });
+
+  it("handles thrown exception in try/catch and logs to console.error", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(resend.emails, "send").mockRejectedValue(
+      new Error("Network failure"),
+    );
+
+    const result = await sendTicketEmail(ticketData);
+
+    expect(result.success).toBe(false);
+    expect(result.error).toBeInstanceOf(Error);
+    expect(consoleSpy).toHaveBeenCalledWith(
+      expect.stringContaining("Erro ao enviar e-mail"),
+      expect.anything(),
+    );
   });
 });
