@@ -198,21 +198,28 @@ export function buildTicketEmailHtml(
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Seu ingresso — ${safeEventName}</title>
     <style>
-      body { margin: 0; padding: 0; background: #f3f4f6; color: #172033; font-family: Arial, sans-serif; }
+      body { margin: 0; padding: 0; background-color: #f1f5f9; color: #172033; font-family: Arial, sans-serif; -webkit-font-smoothing: antialiased; }
       .shell { width: 100%; padding: 32px 12px; }
-      .card { width: 100%; max-width: 600px; margin: 0 auto; overflow: hidden; border-radius: 18px; background: #ffffff; box-shadow: 0 8px 30px rgba(23, 32, 51, 0.08); }
-      .header { padding: 32px; background: #172554; color: #ffffff; text-align: center; }
-      .brand { margin: 0 0 12px; font-size: 16px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #93c5fd; }
-      .header h1 { margin: 0; font-size: 26px; line-height: 1.3; }
+      .card { width: 100%; max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); overflow: hidden; }
+      .header { padding: 32px; background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%); color: #ffffff; text-align: center; }
+      .badge-confirmado { display: inline-block; background-color: #22c55e; color: #ffffff; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: bold; text-transform: uppercase; margin-bottom: 16px; letter-spacing: 0.05em; }
+      .event-name { margin: 0; font-size: 28px; font-weight: 700; line-height: 1.2; }
+      .event-subtitle { margin: 8px 0 0 0; font-size: 16px; color: #bfdbfe; font-weight: 400; }
       .content { padding: 32px; }
-      .greeting { margin: 0 0 16px; font-size: 16px; line-height: 1.5; }
-      .ticket-box { margin: 24px 0; padding: 24px; border: 2px dashed #93c5fd; border-radius: 14px; background: #eff6ff; text-align: center; }
-      .ticket-label { margin: 0 0 6px; font-size: 12px; font-weight: 700; text-transform: uppercase; color: #1e40af; }
-      .ticket-code { margin: 0 0 20px; font-family: Consolas, Monaco, monospace; font-size: 24px; font-weight: 700; letter-spacing: 0.1em; color: #1e3a8a; }
-      .qr-container { display: inline-block; padding: 12px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-      .qr-code-img { display: block; max-width: 220px; width: 100%; height: auto; margin: 0 auto; }
-      .instructions { margin: 20px 0 0; font-size: 14px; color: #475569; line-height: 1.5; }
-      .footer { padding: 20px 32px; background: #f8fafc; color: #64748b; font-size: 12px; text-align: center; border-top: 1px solid #e2e8f0; }
+      .greeting { margin: 0 0 24px; font-size: 16px; line-height: 1.5; color: #334155; }
+      .ticket-box { padding: 24px; border: 2px dashed #cbd5e1; border-radius: 12px; text-align: center; margin-bottom: 24px; background: #eff6ff; }
+      .ticket-label { margin: 0 0 8px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; }
+      .ticket-code { margin: 0 0 24px; font-family: Consolas, Monaco, monospace; font-size: 24px; font-weight: 700; letter-spacing: 0.1em; color: #0f172a; text-transform: uppercase; }
+      .qr-container { display: inline-block; padding: 16px; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); border: 1px solid #e2e8f0; margin-bottom: 16px; }
+      .qr-code-img { display: block; width: 200px; height: 200px; }
+      .instructions-text { margin: 0; font-size: 14px; color: #475569; }
+      .instructions-title { font-size: 15px; font-weight: bold; color: #0f172a; margin: 0 0 12px; }
+      .instructions-list { margin: 0; padding: 0; list-style: none; font-size: 14px; color: #475569; line-height: 1.6; text-align: left; }
+      .instructions-list li { margin-bottom: 8px; padding-left: 20px; position: relative; }
+      .instructions-list li::before { content: "•"; color: #3b82f6; font-weight: bold; position: absolute; left: 0; font-size: 16px; }
+      .footer { padding: 24px 32px; background-color: #f8fafc; border-top: 1px solid #e2e8f0; text-align: center; color: #64748b; font-size: 12px; line-height: 1.5; }
+      .footer p { margin: 0 0 8px; }
+      .footer p:last-child { margin: 0; }
     </style>
   </head>
   <body>
@@ -221,22 +228,46 @@ export function buildTicketEmailHtml(
         <td align="center">
           <div class="card">
             <div class="header">
-              <p class="brand">Evento360</p>
-              <h1>${safeEventName}</h1>
+              <span class="badge-confirmado">Inscrição Confirmada</span>
+              <h1 class="event-name">${safeEventName}</h1>
+              <p class="event-subtitle">Apresente este ingresso no credenciamento</p>
             </div>
             <div class="content">
-              <p class="greeting">Olá, <strong>${safeParticipantName}</strong>! Aqui está o seu ingresso confirmado para o evento.</p>
+              <p class="greeting">Olá, <strong>${safeParticipantName}</strong>! Sua presença está confirmada. Aqui está o seu ingresso.</p>
               <div class="ticket-box">
                 <p class="ticket-label">Código do Ingresso</p>
                 <div class="ticket-code">${safeTicketCode}</div>
                 <div class="qr-container">
-                  <img src="${qrCode}" alt="QR Code do Ingresso" class="qr-code-img" />
+                  <img src="${qrCode}" alt="QR Code do Ingresso" class="qr-code-img" width="200" height="200" />
                 </div>
-                <p class="instructions">Apresente este QR Code no credenciamento ou envie no chatbot para validar seu acesso.</p>
+                <p class="instructions-text">Apresente este QR Code no credenciamento ou envie no chatbot para validar seu acesso.</p>
+              </div>
+              <div style="text-align: left;">
+                <h3 class="instructions-title">Instruções Importantes:</h3>
+                <ul class="instructions-list">
+                  <li><strong>Documento obrigatório:</strong> É necessária a apresentação de um documento oficial com foto.</li>
+                  <li><strong>Chegue cedo:</strong> Recomendamos chegar com 30 minutos de antecedência.</li>
+                  <li><strong>Ingresso nominal:</strong> Este ingresso é pessoal e intransferível.</li>
+                </ul>
               </div>
             </div>
-            <div class="footer">
-              Guarde este e-mail. Ele é seu comprovante oficial de entrada.
+            <div style="background-color: #fafafa; padding: 28px 32px; text-align: center; border-top: 1px solid #e2e8f0;">
+              <p style="margin: 0 0 6px; font-size: 14px; font-weight: 700; color: #0f172a;">
+                Evento360
+              </p>
+              <p style="margin: 0 0 10px; font-size: 12px; color: #64748b;">
+                CNPJ: 67.182.903/0001-67
+              </p>
+              
+              <p style="margin: 0 0 14px; font-size: 12px; color: #64748b; line-height: 1.5;">
+                Av. Monsenhor Ângelo Sampaio, 67 — São José, Petrolina - PE, 56302-290<br/>
+                E-mail: <strong>suporte@evento360.com.br</strong> • WhatsApp: <strong>(87) 99999-9999</strong>
+              </p>
+
+              <p style="margin: 0; font-size: 11px; color: #94a3b8; line-height: 1.4;">
+                Você recebeu este e-mail porque realizou a inscrição em um evento gerenciado pela plataforma Evento360.<br/>
+                © 2026 Evento360. Todos os direitos reservados.
+              </p>
             </div>
           </div>
         </td>

@@ -61,6 +61,8 @@ model Event {
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   publishedAt DateTime?
+  organizerReportSentAt DateTime?
+  registrationDeadline  DateTime?
 
   @@index([organizerId])
 }

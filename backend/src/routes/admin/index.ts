@@ -215,6 +215,31 @@ adminRouter.post("/events/:eventId/publish", async (request, response, next) => 
   }
 });
 
+import { sendOrganizerEventSummary } from "../../services/organizer-report.js";
+
+adminRouter.post("/events/:eventId/close", async (request, response, next) => {
+  try {
+    const event = await findOwnedEvent(
+      request.params.eventId,
+      request.auth!.accountId,
+    );
+    
+    // Set deadline to now so it stops accepting public registrations
+    await prisma.event.update({
+      where: { id: event.id },
+      data: { registrationDeadline: new Date() }
+    });
+
+    // Fire the report manually
+    await sendOrganizerEventSummary(event.id);
+
+    const closedEvent = await findOwnedEvent(event.id, request.auth!.accountId);
+    response.json({ event: serializeAdminEvent(closedEvent) });
+  } catch (error) {
+    next(error);
+  }
+});
+
 adminRouter.get("/events/:eventId/participants", async (request, response, next) => {
   try {
     const event = await findOwnedEvent(

@@ -101,6 +101,7 @@ export async function createRegistration(
         location: true,
         capacity: true,
         status: true,
+        registrationDeadline: true,
       },
     });
 
@@ -113,6 +114,14 @@ export async function createRegistration(
         409,
         "EVENT_NOT_PUBLISHED",
         "Este evento não está disponível para inscrições",
+      );
+    }
+
+    if (event.registrationDeadline && event.registrationDeadline < new Date()) {
+      throw new HttpError(
+        409,
+        "EVENT_CLOSED",
+        "As inscrições para este evento já foram encerradas",
       );
     }
 
