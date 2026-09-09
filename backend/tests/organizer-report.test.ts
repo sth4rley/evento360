@@ -94,9 +94,6 @@ describe("Organizer Report Service", () => {
     });
 
     // --- Second part: test idempotence ---
-    
-    // If we call checkAndSendClosedEventReports again, it might find the same event if update didn't persist in our mock state
-    // Let's manually invoke sendOrganizerEventSummary with an event that already has organizerReportSentAt
     mockPrisma.event.findUnique.mockResolvedValueOnce({
       id: "event-1",
       name: "Test Event",

@@ -27,7 +27,6 @@ export default defineConfig({
       "tests/registration-notifications.test.ts",
       "tests/password-reset-email.test.ts",
       "tests/ticket-qa.test.ts",
-      "tests/e2e-ticket-flow.test.ts",
       "tests/organizer-report.test.ts",
     ],
     env: {
