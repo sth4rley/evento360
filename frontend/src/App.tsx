@@ -395,7 +395,7 @@ function EventListPage({ organizer, onLogout }: { organizer: Organizer; onLogout
       <span className={`badge ${event.status === "PUBLISHED" ? "badge-blue" : "badge-gray"}`}>{event.status === "PUBLISHED" ? "Publicado" : "Rascunho"}</span>
       <h3>{event.name}</h3>
       <div className="event-info"><span><AppIcon name="calendar" size={17} /> {dateFormat.format(new Date(event.date))}</span><span><AppIcon name="map-pin" size={17} /> {event.location}</span><span><AppIcon name="users" size={17} /> Capacidade para {event.capacity} pessoas</span></div>
-      <div className="button-row"><Button className="button-primary" onClick={() => navigate(`/admin/events/${event.id}`)}>Gerenciar</Button>{event.status === "PUBLISHED" ? <Button className="button-secondary" onClick={() => navigate(`/event/${event.publicId}`)}>Ver página</Button> : null}<Button className="button-danger" disabled={deletingId === event.id} onClick={() => setConfirmDeleteId(event.id)}>Remover</Button></div>
+      <div className="button-row"><Button className="button-primary" onClick={() => navigate(`/admin/events/${event.id}`)}>Gerenciar</Button><Button className="button-secondary" onClick={() => navigate(`/admin/events/${event.id}/edit`)}>Editar</Button>{event.status === "PUBLISHED" ? <Button className="button-secondary" onClick={() => navigate(`/event/${event.publicId}`)}>Ver página</Button> : null}<Button className="button-danger" disabled={deletingId === event.id} onClick={() => setConfirmDeleteId(event.id)}>Remover</Button></div>
       {confirmDeleteId === event.id ? <div className="event-delete-confirm" role="alert"><strong>Remover este evento?</strong><p>Ele sairá da sua lista e não ficará mais disponível ao público.</p><div className="button-row"><Button className="button-danger" disabled={deletingId === event.id} onClick={() => removeEvent(event.id)}>{deletingId === event.id ? "Removendo…" : "Confirmar remoção"}</Button><Button className="button-secondary" disabled={deletingId === event.id} onClick={() => setConfirmDeleteId(null)}>Cancelar</Button></div></div> : null}
     </article>)}</div>
   </AdminLayout>;
@@ -455,13 +455,22 @@ function locateMockAddress(query: string): MockAddress {
   };
 }
 
-function NewEventPage({ organizer, onLogout }: { organizer: Organizer; onLogout: () => void }) {
-  const [name, setName] = useState("");
-  const [date, setDate] = useState("");
-  const [location, setLocation] = useState("");
+type EventFormValues = { name: string; date: string; location: string; capacity: number };
+
+// `datetime-local` trabalha no fuso do navegador, sem offset.
+function toDateTimeLocal(value: string) {
+  const date = new Date(value);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function EventForm({ initial, submitLabel, submittingLabel, onSubmit }: { initial?: AdminEvent; submitLabel: string; submittingLabel: string; onSubmit: (values: EventFormValues) => Promise<void> }) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [date, setDate] = useState(initial ? toDateTimeLocal(initial.date) : "");
+  const [location, setLocation] = useState(initial?.location ?? "");
   const [addressQuery, setAddressQuery] = useState("");
   const [address, setAddress] = useState<MockAddress | null>(null);
-  const [capacity, setCapacity] = useState("");
+  const [capacity, setCapacity] = useState(initial ? String(initial.capacity) : "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   function searchAddress() {
@@ -479,17 +488,40 @@ function NewEventPage({ organizer, onLogout }: { organizer: Organizer; onLogout:
     if (!location) { setError("Busque e confirme o local do evento no mapa."); return; }
     setLoading(true); setError(null);
     try {
-      const result = await apiRequest<{ event: AdminEvent }>("/api/admin/events", { method: "POST", auth: "organizer", body: JSON.stringify({ name, date, location, capacity: parsedCapacity }) });
-      navigate(`/admin/events/${result.event.id}`);
+      await onSubmit({ name, date: new Date(date).toISOString(), location, capacity: parsedCapacity });
     } catch (requestError) { setError(messageFrom(requestError)); } finally { setLoading(false); }
+  }
+  return <form className="form-card" onSubmit={submit}>
+      <div className="form-grid"><Field label="Nome do evento"><input disabled={loading} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Conecta Vale 2026" required value={name} /></Field><div className="location-picker"><span>Local do evento</span><div className="address-search"><input disabled={loading} onChange={(event) => setAddressQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchAddress(); } }} placeholder="Busque por rua, bairro ou ponto de referência" value={addressQuery} /><Button className="button-secondary" disabled={loading} onClick={searchAddress} type="button">Buscar no mapa</Button></div><div className="map-mock" role="img" aria-label="Mapa simulado para localização do evento"><span className="map-status">{address ? `Marcador posicionado em ${address.label}.` : location ? `Local atual: ${location}. Busque um endereço para alterá-lo.` : "Busque um endereço para posicionar o marcador."}</span>{address ? <i className="map-marker" style={{ left: address.x, top: address.y }} /> : null}</div><div className="address-details"><Field label="Rua"><input readOnly value={address?.street ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Bairro"><input readOnly value={address?.neighborhood ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Cidade"><input readOnly value={address?.city ?? ""} placeholder="Preenchido pela busca" /></Field></div><Field label="Local confirmado"><input readOnly required value={location} placeholder="O local selecionado aparecerá aqui" /></Field></div><Field label="Data e horário"><input disabled={loading} onChange={(event) => setDate(event.target.value)} required type="datetime-local" value={date} /></Field><Field label="Capacidade máxima"><input disabled={loading} min="1" onChange={(event) => setCapacity(event.target.value)} placeholder="120" required step="1" type="number" value={capacity} /></Field></div>
+      {error ? <Alert>{error}</Alert> : null}
+      <footer className="form-actions"><Button className="button-secondary" onClick={() => navigate(initial ? `/admin/events/${initial.id}` : "/admin/events")} type="button">Cancelar</Button><Button className="button-primary" disabled={loading} type="submit">{loading ? submittingLabel : submitLabel}</Button></footer>
+    </form>;
+}
+
+function NewEventPage({ organizer, onLogout }: { organizer: Organizer; onLogout: () => void }) {
+  async function create(values: EventFormValues) {
+    const result = await apiRequest<{ event: AdminEvent }>("/api/admin/events", { method: "POST", auth: "organizer", body: JSON.stringify(values) });
+    navigate(`/admin/events/${result.event.id}`);
   }
   return <AdminLayout active="new" onLogout={onLogout} organizer={organizer}>
     <PageTitle title="Criar novo evento" subtitle="Cadastre as informações principais para começar." />
-    <form className="form-card" onSubmit={submit}>
-      <div className="form-grid"><Field label="Nome do evento"><input disabled={loading} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Conecta Vale 2026" required value={name} /></Field><div className="location-picker"><span>Local do evento</span><div className="address-search"><input disabled={loading} onChange={(event) => setAddressQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchAddress(); } }} placeholder="Busque por rua, bairro ou ponto de referência" value={addressQuery} /><Button className="button-secondary" disabled={loading} onClick={searchAddress} type="button">Buscar no mapa</Button></div><div className="map-mock" role="img" aria-label="Mapa simulado para localização do evento"><span className="map-status">{address ? `Marcador posicionado em ${address.label}.` : "Busque um endereço para posicionar o marcador."}</span>{address ? <i className="map-marker" style={{ left: address.x, top: address.y }} /> : null}</div><div className="address-details"><Field label="Rua"><input readOnly value={address?.street ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Bairro"><input readOnly value={address?.neighborhood ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Cidade"><input readOnly value={address?.city ?? ""} placeholder="Preenchido pela busca" /></Field></div><Field label="Local confirmado"><input readOnly required value={location} placeholder="O local selecionado aparecerá aqui" /></Field></div><Field label="Data e horário"><input disabled={loading} onChange={(event) => setDate(event.target.value)} required type="datetime-local" value={date} /></Field><Field label="Capacidade máxima"><input disabled={loading} min="1" onChange={(event) => setCapacity(event.target.value)} placeholder="120" required step="1" type="number" value={capacity} /></Field></div>
-      {error ? <Alert>{error}</Alert> : null}
-      <footer className="form-actions"><Button className="button-secondary" onClick={() => navigate("/admin/events")} type="button">Cancelar</Button><Button className="button-primary" disabled={loading} type="submit">{loading ? "Criando…" : "Criar evento"}</Button></footer>
-    </form>
+    <EventForm onSubmit={create} submitLabel="Criar evento" submittingLabel="Criando…" />
+  </AdminLayout>;
+}
+
+function EditEventPage({ eventId, organizer, onLogout }: { eventId: string; organizer: Organizer; onLogout: () => void }) {
+  const [event, setEvent] = useState<AdminEvent | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => { let mounted = true; apiRequest<{ event: AdminEvent }>(`/api/admin/events/${eventId}`, { auth: "organizer" }).then((result) => mounted && setEvent(result.event)).catch((requestError) => mounted && setError(messageFrom(requestError))).finally(() => mounted && setLoading(false)); return () => { mounted = false; }; }, [eventId]);
+  async function save(values: EventFormValues) {
+    await apiRequest<{ event: AdminEvent }>(`/api/admin/events/${eventId}`, { method: "PUT", auth: "organizer", body: JSON.stringify(values) });
+    navigate(`/admin/events/${eventId}`);
+  }
+  return <AdminLayout active="events" eventId={eventId} onLogout={onLogout} organizer={organizer}>
+    <PageTitle title="Editar evento" subtitle={event?.status === "PUBLISHED" ? "O evento está publicado: as alterações aparecem imediatamente na página pública." : "Atualize as informações principais do evento."} />
+    {loading ? <p className="loading-text">Carregando evento…</p> : null}{error ? <Alert>{error}</Alert> : null}
+    {event ? <EventForm initial={event} key={event.id} onSubmit={save} submitLabel="Salvar alterações" submittingLabel="Salvando…" /> : null}
   </AdminLayout>;
 }
 
@@ -504,7 +536,7 @@ function EventManagementPage({ eventId, organizer, onLogout }: { eventId: string
   const publicUrl = event?.status === "PUBLISHED" ? `${window.location.origin}/event/${event.publicId}` : null;
   return <AdminLayout active="events" eventId={eventId} onLogout={onLogout} organizer={organizer}>
     {loading ? <p className="loading-text">Carregando evento…</p> : null}{error ? <Alert>{error}</Alert> : null}
-    {event ? <><PageTitle title={event.name} subtitle={`${dateFormat.format(new Date(event.date))} • ${event.location}`} actions={<div className="button-row"><Button className="button-secondary" onClick={() => navigate(`/admin/events/${event.id}/participants`)}><AppIcon name="users" size={17} /> Participantes</Button><Button className="button-secondary" onClick={() => navigate(`/admin/events/${event.id}/check-in`)}><AppIcon name="checkin" size={17} /> Check-in</Button>{event.status === "DRAFT" ? <Button className="button-primary" disabled={publishing} onClick={publish}>{publishing ? "Publicando…" : "Publicar evento"}</Button> : null}</div>} />
+    {event ? <><PageTitle title={event.name} subtitle={`${dateFormat.format(new Date(event.date))} • ${event.location}`} actions={<div className="button-row"><Button className="button-secondary" onClick={() => navigate(`/admin/events/${event.id}/edit`)}>Editar</Button><Button className="button-secondary" onClick={() => navigate(`/admin/events/${event.id}/participants`)}><AppIcon name="users" size={17} /> Participantes</Button><Button className="button-secondary" onClick={() => navigate(`/admin/events/${event.id}/check-in`)}><AppIcon name="checkin" size={17} /> Check-in</Button>{event.status === "DRAFT" ? <Button className="button-primary" disabled={publishing} onClick={publish}>{publishing ? "Publicando…" : "Publicar evento"}</Button> : null}</div>} />
       <div className="event-status-row"><span className={`badge ${event.status === "PUBLISHED" ? "badge-blue" : "badge-gray"}`}>{event.status === "PUBLISHED" ? "Publicado" : "Rascunho"}</span><span>Capacidade máxima: <strong>{event.capacity}</strong></span></div>
       {publicUrl ? <div className="link-card"><strong>{publishedNow ? "Evento publicado com sucesso" : "Link público do evento"}</strong><p>{publicUrl}</p><Button className="button-secondary" onClick={() => navigator.clipboard?.writeText(publicUrl)}>Copiar link</Button></div> : null}</> : null}
   </AdminLayout>;
@@ -772,6 +804,7 @@ export function App() {
   if (route.id === "admin-participants" && organizer) return <AdminEventSelectorPage mode="participants" onLogout={logoutOrganizer} organizer={organizer} />;
   if (route.id === "admin-checkin" && organizer) return <AdminEventSelectorPage mode="checkin" onLogout={logoutOrganizer} organizer={organizer} />;
   if (route.id === "admin-event-new" && organizer) return <NewEventPage onLogout={logoutOrganizer} organizer={organizer} />;
+  if (route.id === "admin-event-edit" && organizer) return <EditEventPage eventId={route.params.eventId} onLogout={logoutOrganizer} organizer={organizer} />;
   if (route.id === "admin-event-participants" && organizer) return <ParticipantsPage eventId={route.params.eventId} onLogout={logoutOrganizer} organizer={organizer} />;
   if (route.id === "admin-event-checkin" && organizer) return <CheckInPage eventId={route.params.eventId} onLogout={logoutOrganizer} organizer={organizer} />;
   if (route.id === "admin-event" && organizer) return <EventManagementPage eventId={route.params.eventId} onLogout={logoutOrganizer} organizer={organizer} />;

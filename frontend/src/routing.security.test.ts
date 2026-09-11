@@ -38,6 +38,11 @@ describe("route matching", () => {
       access: "ORGANIZER",
       params: { eventId: "event-id" },
     });
+    expect(matchRoute("/admin/events/event-id/edit")).toMatchObject({
+      id: "admin-event-edit",
+      access: "ORGANIZER",
+      params: { eventId: "event-id" },
+    });
     expect(matchRoute("/admin/events/event-id/check-in")).toMatchObject({
       id: "admin-event-checkin",
       access: "ORGANIZER",

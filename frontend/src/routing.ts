@@ -20,6 +20,7 @@ export type RouteId =
   | "admin-checkin"
   | "admin-event-new"
   | "admin-event"
+  | "admin-event-edit"
   | "admin-event-participants"
   | "admin-event-checkin"
   | "not-found";
@@ -147,6 +148,13 @@ export function matchRoute(pathname: string): RouteMatch {
   }
   if (path === "/admin/events/new") {
     return matched("admin-event-new", "ORGANIZER");
+  }
+
+  result = path.match(/^\/admin\/events\/([^/]+)\/edit$/);
+  if (result) {
+    return matched("admin-event-edit", "ORGANIZER", {
+      eventId: decoded(result[1]),
+    });
   }
 
   result = path.match(/^\/admin\/events\/([^/]+)\/participants$/);
