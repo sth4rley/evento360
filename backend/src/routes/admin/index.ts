@@ -1,3 +1,4 @@
+import { Prisma, RegistrationStatus } from "@prisma/client";
 import { Router } from "express";
 import {
   authenticateOrganizer,
@@ -180,6 +181,50 @@ adminRouter.get("/events/:eventId", async (request, response, next) => {
       request.params.eventId,
       request.auth!.accountId,
     );
+
+    response.json({ event: serializeAdminEvent(event) });
+  } catch (error) {
+    next(error);
+  }
+});
+
+adminRouter.put("/events/:eventId", async (request, response, next) => {
+  try {
+    const input = parseCreateEventInput(request.body as unknown);
+    const owned = await findOwnedEvent(
+      request.params.eventId,
+      request.auth!.accountId,
+    );
+
+    // Mesmo bloqueio usado nas inscrições: reduzir a capacidade não pode
+    // concorrer com uma nova inscrição e deixar o evento acima do limite.
+    const event = await prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw(
+        Prisma.sql`SELECT id FROM "Event" WHERE id = ${owned.id}::uuid FOR UPDATE`,
+      );
+      const current = await transaction.event.findUniqueOrThrow({
+        where: { id: owned.id },
+        select: { status: true },
+      });
+
+      if (current.status === "ARCHIVED") {
+        throw new HttpError(404, "EVENT_NOT_FOUND", "Evento não encontrado");
+      }
+
+      const activeRegistrations = await transaction.registration.count({
+        where: { eventId: owned.id, status: RegistrationStatus.ACTIVE },
+      });
+
+      if (input.capacity < activeRegistrations) {
+        throw new HttpError(
+          409,
+          "CAPACITY_BELOW_REGISTRATIONS",
+          `A capacidade não pode ser menor que as ${activeRegistrations} inscrições ativas`,
+        );
+      }
+
+      return transaction.event.update({ where: { id: owned.id }, data: input });
+    });
 
     response.json({ event: serializeAdminEvent(event) });
   } catch (error) {
