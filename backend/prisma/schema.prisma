@@ -16,6 +16,7 @@ enum EventStatus {
 enum RegistrationStatus {
   ACTIVE
   CANCELLED
+  WAITLISTED
 }
 
 model Organizer {
@@ -82,9 +83,11 @@ model Registration {
   createdAt         DateTime           @default(now())
   cancelledAt       DateTime?
   checkedInAt       DateTime?
+  promotedAt        DateTime?
 
   @@index([eventId])
   @@index([participantId])
   @@index([status])
   @@index([eventId, participantEmail, status])
+  @@index([eventId, status, createdAt])
 }

@@ -359,6 +359,14 @@ adminRouter.post(
         );
       }
 
+      if (registration.status === "WAITLISTED") {
+        throw new HttpError(
+          409,
+          "REGISTRATION_WAITLISTED",
+          "Inscrições na lista de espera não podem receber check-in",
+        );
+      }
+
       const update = await prisma.registration.updateMany({
         where: {
           id: registration.id,

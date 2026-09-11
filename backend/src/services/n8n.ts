@@ -7,12 +7,18 @@ import {
 
 const WEBHOOK_TIMEOUT_MS = 5_000;
 
+export type RegistrationWebhookType =
+  | "registration.created"
+  | "registration.waitlisted"
+  | "registration.promoted";
+
 export function buildRegistrationCreatedWebhookPayload(
   created: CreatedRegistration,
   occurredAt = new Date(),
+  type: RegistrationWebhookType = "registration.created",
 ) {
   return {
-    type: "registration.created",
+    type,
     occurredAt: occurredAt.toISOString(),
     event: {
       id: created.event.id,
@@ -30,12 +36,16 @@ export function buildRegistrationCreatedWebhookPayload(
       status: created.registration.status,
       confirmationCode: created.registration.confirmationCode,
       createdAt: created.registration.createdAt.toISOString(),
+      ...(created.registration.waitlistPosition
+        ? { waitlistPosition: created.registration.waitlistPosition }
+        : {}),
     },
   };
 }
 
 export async function sendRegistrationCreatedWebhook(
   created: CreatedRegistration,
+  type: RegistrationWebhookType = "registration.created",
 ): Promise<void> {
   const { n8nRegistrationWebhookUrl, n8nWebhookSecret } = env;
 
@@ -57,7 +67,9 @@ export async function sendRegistrationCreatedWebhook(
         "Content-Type": "application/json",
         "X-Evento360-Webhook-Secret": n8nWebhookSecret,
       },
-      body: JSON.stringify(buildRegistrationCreatedWebhookPayload(created)),
+      body: JSON.stringify(
+        buildRegistrationCreatedWebhookPayload(created, new Date(), type),
+      ),
       signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS),
     });
   } catch (error) {

@@ -13,6 +13,7 @@ de negócio e a autorização de organizadores e participantes.
 - Login independente de organizador e participante; cadastro de participantes.
 - Recuperação de senha com token de uso único e expiração.
 - Inscrição com ou sem conta, controle transacional de vagas e prevenção de duplicidade.
+- Lista de espera para eventos lotados, com promoção automática por ordem de chegada quando uma vaga é liberada.
 - Comprovante por código, cancelamento por token e painel de inscrições do participante.
 - Painel do organizador com inscritos, métricas e check-in.
 - Confirmação por e-mail via Resend e webhook opcional para n8n.
@@ -178,8 +179,11 @@ Crie e ative um workflow com Webhook POST e autenticação do header
 `X-Evento360-Webhook-Secret`. Em produção, use HTTPS. Deixe as duas variáveis
 vazias para desativar o webhook.
 
-O payload possui `type: registration.created`, `occurredAt`, `event` e
-`registration`. Envia dados do evento, nome, e-mail, WhatsApp normalizado,
+O payload possui `type`, `occurredAt`, `event` e `registration`. O `type` é
+`registration.created` para inscrições confirmadas, `registration.waitlisted`
+quando a pessoa entra na lista de espera (com `registration.waitlistPosition`)
+e `registration.promoted` quando uma vaga liberada é repassada à fila. Filtre
+pelo `type` no n8n para não enviar confirmação de vaga a quem só está na fila. Envia dados do evento, nome, e-mail, WhatsApp normalizado,
 status, data e código da inscrição. `registration.id` e
 `registration.confirmationCode` são o mesmo código público de oito dígitos;
 o UUID interno, tokens de cancelamento, senhas e chaves não são enviados.

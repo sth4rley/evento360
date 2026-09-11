@@ -120,8 +120,95 @@ export function buildRegistrationConfirmationEmail(
   };
 }
 
+export function buildWaitlistEmail(
+  created: CreatedRegistration,
+  publicAppUrl = env.publicAppUrl,
+): { subject: string; html: string } {
+  const { event, registration } = created;
+  const confirmationUrl = registrationUrl(
+    publicAppUrl,
+    "registration",
+    registration.confirmationCode,
+  );
+  const cancellationUrl = registrationUrl(
+    publicAppUrl,
+    "registration/cancel",
+    registration.cancellationToken,
+  );
+  const formattedDate = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "long",
+    timeStyle: "short",
+  }).format(event.date);
+  const position = registration.waitlistPosition
+    ? `<li><span class="label">Sua posição na fila</span>${registration.waitlistPosition}º</li>`
+    : "";
+
+  return {
+    subject: `Você está na lista de espera — ${event.name}`,
+    html: `<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+      body { margin: 0; padding: 0; background: #f3f4f6; color: #172033; font-family: Arial, sans-serif; }
+      .card { max-width: 600px; margin: 32px auto; overflow: hidden; border-radius: 18px; background: #ffffff; }
+      .header { padding: 32px; background: #172554; color: #ffffff; }
+      .header h1 { margin: 0; font-size: 26px; line-height: 1.25; }
+      .content { padding: 32px; }
+      .content p { margin: 0 0 20px; line-height: 1.6; }
+      .status { display: inline-block; margin-bottom: 24px; border-radius: 999px; padding: 8px 14px; background: #fef3c7; color: #92400e; font-size: 13px; font-weight: 700; text-transform: uppercase; }
+      .details { margin: 0 0 28px; padding: 0; list-style: none; border: 1px solid #e5e7eb; border-radius: 12px; }
+      .details li { padding: 14px 18px; border-bottom: 1px solid #e5e7eb; }
+      .details li:last-child { border-bottom: 0; }
+      .label { display: block; margin-bottom: 3px; color: #64748b; font-size: 12px; font-weight: 700; text-transform: uppercase; }
+      .button { display: inline-block; border-radius: 10px; padding: 14px 22px; background: #2563eb; color: #ffffff !important; font-weight: 700; text-decoration: none; }
+      .secondary a { color: #475569; font-size: 13px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="header"><h1>Você está na lista de espera</h1></div>
+      <div class="content">
+        <span class="status">Lista de espera</span>
+        <p>Olá, <strong>${escapeHtml(registration.participantName)}</strong>! O evento está lotado, mas guardamos seu lugar na fila. Se uma vaga abrir, sua inscrição será confirmada automaticamente e você receberá o ingresso por e-mail.</p>
+        <ul class="details">
+          <li><span class="label">Evento</span>${escapeHtml(event.name)}</li>
+          <li><span class="label">Data</span>${escapeHtml(formattedDate)}</li>
+          <li><span class="label">Local</span>${escapeHtml(event.location)}</li>
+          ${position}
+          <li><span class="label">Código para consulta</span>${escapeHtml(registration.confirmationCode)}</li>
+        </ul>
+        <a class="button" href="${escapeHtml(confirmationUrl)}">Acompanhar minha posição</a>
+        <p class="secondary">Não tem mais interesse? <a href="${escapeHtml(cancellationUrl)}">Sair da lista de espera</a></p>
+      </div>
+    </div>
+  </body>
+</html>`,
+  };
+}
+
 export async function sendRegistrationConfirmationEmail(
   created: CreatedRegistration,
+): Promise<void> {
+  await postResendEmail(
+    created.registration.participantEmail,
+    buildRegistrationConfirmationEmail(created),
+  );
+}
+
+export async function sendWaitlistEmail(
+  created: CreatedRegistration,
+): Promise<void> {
+  await postResendEmail(
+    created.registration.participantEmail,
+    buildWaitlistEmail(created),
+  );
+}
+
+async function postResendEmail(
+  to: string,
+  email: { subject: string; html: string },
 ): Promise<void> {
   const { resendApiKey, resendFromEmail } = env;
 
@@ -133,7 +220,6 @@ export async function sendRegistrationConfirmationEmail(
     throw new IntegrationError("CONFIGURATION_INCOMPLETE");
   }
 
-  const email = buildRegistrationConfirmationEmail(created);
   let response: Response;
 
   try {
@@ -146,7 +232,7 @@ export async function sendRegistrationConfirmationEmail(
       },
       body: JSON.stringify({
         from: resendFromEmail,
-        to: created.registration.participantEmail,
+        to,
         subject: email.subject,
         html: email.html,
       }),
