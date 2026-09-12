@@ -12,6 +12,7 @@ import {
   resetPassword,
 } from "../../auth/password-reset-flow.js";
 import { createAccessToken } from "../../auth/token.js";
+import { beginGoogleOAuth } from "../../auth/google-oauth.js";
 import {
   assertEventReadyForPublication,
   parseCreateEventInput,
@@ -51,6 +52,10 @@ adminRouter.post("/auth/login", async (request, response, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+adminRouter.get("/auth/google", (request, response, next) => {
+  try { beginGoogleOAuth("organizer", request, response); } catch (error) { next(error); }
 });
 
 adminRouter.post("/auth/forgot-password", async (request, response, next) => {

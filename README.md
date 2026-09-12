@@ -50,6 +50,20 @@ Antes de iniciar:
    `backend/.env`. O placeholder do exemplo é recusado pela API.
 3. Deixe as variáveis Resend/n8n vazias para testar sem envio de mensagens.
 
+### Login com Google
+
+Crie um cliente OAuth 2.0 do tipo **Aplicativo da Web** no Google Cloud Console.
+Em `backend/.env`, preencha `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` e
+`GOOGLE_OAUTH_REDIRECT_URI`. Para desenvolvimento local, cadastre exatamente
+`http://localhost:3000/api/public/auth/google/callback` como URI de
+redirecionamento autorizado e use esse mesmo valor na variável. Em produção,
+utilize a URL HTTPS pública da API. Nunca exponha `GOOGLE_CLIENT_SECRET` no
+frontend.
+
+Participantes podem criar a conta na primeira entrada com Google. Para acesso
+de organizador, o e-mail Google precisa corresponder a um organizador já
+cadastrado; isso preserva a separação entre áreas públicas e administrativas.
+
 ```powershell
 node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
 ```

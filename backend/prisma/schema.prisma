@@ -25,6 +25,7 @@ model Organizer {
   email                  String  @unique
   passwordHash           String?
   authProvider           String?
+  googleSubject          String? @unique
   passwordResetTokenHash String? @unique
   passwordResetExpiresAt DateTime?
   sessionVersion         Int     @default(0)
@@ -38,8 +39,9 @@ model Participant {
   username               String  @unique
   name                   String
   email                  String  @unique
-  passwordHash           String
+  passwordHash           String?
   authProvider           String?
+  googleSubject          String? @unique
   passwordResetTokenHash String? @unique
   passwordResetExpiresAt DateTime?
   sessionVersion         Int     @default(0)
@@ -60,11 +62,10 @@ model Event {
   publicId    String        @unique @default(cuid())
   registrations Registration[]
   createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  updatedAt   DateTime @updatedAt
   publishedAt DateTime?
   organizerReportSentAt DateTime?
-  registrationDeadline  DateTime?
-
+  registrationDeadline DateTime?
   @@index([organizerId])
 }
 
@@ -83,6 +84,7 @@ model Registration {
   createdAt         DateTime           @default(now())
   cancelledAt       DateTime?
   checkedInAt       DateTime?
+ HEAD
   promotedAt        DateTime?
 
   @@index([eventId])

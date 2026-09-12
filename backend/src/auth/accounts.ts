@@ -1,4 +1,4 @@
-import type { Organizer, Participant } from "@prisma/client";
+import { Prisma, type Organizer, type Participant } from "@prisma/client";
 import { prisma } from "../lib/prisma.js";
 import { verifyPassword } from "./password.js";
 import type { AuthSession } from "./types.js";
@@ -80,6 +80,32 @@ export async function authenticateParticipant(
   return (await verifyPassword(password, participant?.passwordHash))
     ? participant
     : null;
+}
+
+function googleUsername(email: string): string {
+  const base = email.split("@")[0].toLowerCase().replace(/[^a-z0-9._-]/g, "-").replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "");
+  return (base.length >= 3 ? base : "usuario").slice(0, 24);
+}
+
+export async function findOrCreateGoogleParticipant(input: { sub: string; email: string; name?: string }): Promise<Participant> {
+  const bySubject = await prisma.participant.findUnique({ where: { googleSubject: input.sub } });
+  if (bySubject) return bySubject;
+  const byEmail = await prisma.participant.findUnique({ where: { email: input.email } });
+  if (byEmail) return prisma.participant.update({ where: { id: byEmail.id }, data: { googleSubject: input.sub, authProvider: byEmail.authProvider === "password" ? "password+google" : "google" } });
+  const base = googleUsername(input.email);
+  for (let suffix = 0; suffix < 100; suffix += 1) {
+    const username = suffix ? `${base.slice(0, 30 - String(suffix).length - 1)}-${suffix}` : base;
+    try { return await prisma.participant.create({ data: { username, name: input.name?.trim().slice(0, 100) || username, email: input.email, authProvider: "google", googleSubject: input.sub } }); }
+    catch (error) { if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2002") throw error; }
+  }
+  throw new Error("Could not allocate a username for Google account");
+}
+
+export async function findGoogleOrganizer(input: { sub: string; email: string }): Promise<Organizer | null> {
+  const bySubject = await prisma.organizer.findUnique({ where: { googleSubject: input.sub } });
+  if (bySubject) return bySubject;
+  const byEmail = await prisma.organizer.findUnique({ where: { email: input.email } });
+  return byEmail ? prisma.organizer.update({ where: { id: byEmail.id }, data: { googleSubject: input.sub, authProvider: byEmail.authProvider === "password" ? "password+google" : "google" } }) : null;
 }
 
 export async function findAccountBySession(

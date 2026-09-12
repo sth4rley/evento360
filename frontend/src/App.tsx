@@ -3,6 +3,7 @@ import {
   ApiError,
   apiRequest,
   clearAccessToken,
+  getApiUrl,
   getAccessToken,
   getPreferredAuthScope,
   sessionExpiredEvent,
@@ -209,8 +210,27 @@ function LoginPage({ profile, onLoggedIn }: { profile: AccountProfile; onLoggedI
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [futureNotice, setFutureNotice] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.hash.slice(1)).get("google_token");
+    if (!token) return;
+    let active = true;
+    setLoading(true);
+    setError(null);
+    setAccessToken(token, profile);
+    const endpoint = profile === "participant" ? "/api/public/auth/me" : "/api/admin/auth/me";
+    apiRequest<{ participant?: ParticipantAccount; organizer?: Organizer }>(endpoint, { auth: profile })
+      .then((result) => {
+        if (!active) return;
+        onLoggedIn((profile === "participant" ? result.participant : result.organizer) as AccountIdentity);
+        navigate(profile === "participant" ? paths.participantEvents : paths.adminEvents, { replace: true });
+      })
+      .catch((requestError) => { clearAccessToken(profile); if (active) setError(messageFrom(requestError)); })
+      .finally(() => { if (active) setLoading(false); });
+    window.history.replaceState({}, "", window.location.pathname);
+    return () => { active = false; };
+  }, [onLoggedIn, profile]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -255,8 +275,7 @@ function LoginPage({ profile, onLoggedIn }: { profile: AccountProfile; onLoggedI
           <Button className="button-primary button-block" disabled={loading} type="submit">{loading ? "Entrando…" : "Entrar"}</Button>
         </form>
         <div className="auth-divider"><span>ou</span></div>
-        <Button className="google-button button-block" onClick={() => setFutureNotice("O acesso com Google está preparado visualmente e será ativado em uma próxima etapa.")} type="button"><GoogleIcon /> Continuar com Google</Button>
-        {futureNotice ? <p aria-live="polite" className="future-notice">{futureNotice}</p> : null}
+        <Button className="google-button button-block" disabled={loading} onClick={() => { window.location.assign(getApiUrl(profile === "participant" ? "/api/public/auth/google" : "/api/admin/auth/google")); }} type="button"><GoogleIcon /> Continuar com Google</Button>
         {participantLogin ? <p className="signup-prompt">Ainda não possui uma conta? <button onClick={() => navigate(paths.signup)} type="button">Criar conta</button></p> : null}
         <p className="signup-prompt"><button onClick={() => navigate(participantLogin ? paths.organizerLogin : paths.participantLogin)} type="button">Entrar como {participantLogin ? "organizador" : "participante"}</button> · <button onClick={() => navigate(paths.home)} type="button">Voltar aos eventos</button></p>
   </AuthShell>;

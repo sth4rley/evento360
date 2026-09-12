@@ -24,6 +24,21 @@ function optionalEnvironmentValue(name: string): string | undefined {
 }
 
 const webhookUrl = optionalEnvironmentValue("N8N_REGISTRATION_WEBHOOK_URL");
+const googleClientId = optionalEnvironmentValue("GOOGLE_CLIENT_ID");
+const googleClientSecret = optionalEnvironmentValue("GOOGLE_CLIENT_SECRET");
+const googleOAuthRedirectUri = optionalEnvironmentValue("GOOGLE_OAUTH_REDIRECT_URI");
+
+if (Boolean(googleClientId) !== Boolean(googleClientSecret) || Boolean(googleClientId) !== Boolean(googleOAuthRedirectUri)) {
+  throw new Error("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and GOOGLE_OAUTH_REDIRECT_URI must be configured together");
+}
+
+if (googleOAuthRedirectUri) {
+  let url: URL;
+  try { url = new URL(googleOAuthRedirectUri); } catch { throw new Error("GOOGLE_OAUTH_REDIRECT_URI must be a valid URL"); }
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash || (nodeEnv === "production" && url.protocol !== "https:")) {
+    throw new Error("GOOGLE_OAUTH_REDIRECT_URI must be an HTTP(S) URL, with HTTPS in production");
+  }
+}
 if (webhookUrl) {
   let url: URL;
   try { url = new URL(webhookUrl); } catch { throw new Error("N8N_REGISTRATION_WEBHOOK_URL must be a valid URL"); }
@@ -50,4 +65,7 @@ export const env = {
   resendFromEmail: optionalEnvironmentValue("RESEND_FROM_EMAIL"),
   n8nRegistrationWebhookUrl: webhookUrl,
   n8nWebhookSecret: optionalEnvironmentValue("N8N_WEBHOOK_SECRET"),
+  googleClientId,
+  googleClientSecret,
+  googleOAuthRedirectUri,
 };

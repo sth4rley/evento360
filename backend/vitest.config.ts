@@ -28,6 +28,7 @@ export default defineConfig({
       "tests/password-reset-email.test.ts",
       "tests/ticket-qa.test.ts",
       "tests/organizer-report.test.ts",
+      "tests/google-oauth.test.ts",
     ],
     env: {
       NODE_ENV: "test",
@@ -39,6 +40,9 @@ export default defineConfig({
         process.env.RESEND_FROM_EMAIL || "ingressos@seuevento.com.br",
       N8N_REGISTRATION_WEBHOOK_URL: "",
       N8N_WEBHOOK_SECRET: "",
+      GOOGLE_CLIENT_ID: "google-test-client-id",
+      GOOGLE_CLIENT_SECRET: "google-test-client-secret",
+      GOOGLE_OAUTH_REDIRECT_URI: "http://localhost:3000/api/public/auth/google/callback",
     },
   },
 });

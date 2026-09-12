@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 import { Router } from "express";
 import {
   authenticateParticipant,
+  findGoogleOrganizer,
+  findOrCreateGoogleParticipant,
   invalidateAccountSessions,
   serializeParticipant,
 } from "../../auth/accounts.js";
@@ -19,6 +21,8 @@ import {
   resetPassword,
 } from "../../auth/password-reset-flow.js";
 import { createAccessToken } from "../../auth/token.js";
+import { beginGoogleOAuth, clearGoogleOAuthState, googleUserFromCallback } from "../../auth/google-oauth.js";
+import { env } from "../../config/env.js";
 import { serializePublicEvent } from "../../domain/public-events.js";
 import {
   cancelRegistration,
@@ -124,6 +128,28 @@ publicRouter.post("/auth/login", async (request, response, next) => {
   } catch (error) {
     next(error);
   }
+});
+
+publicRouter.get("/auth/google", (request, response, next) => {
+  try { beginGoogleOAuth("participant", request, response); } catch (error) { next(error); }
+});
+
+publicRouter.get("/auth/google/callback", async (request, response, next) => {
+  try {
+    const { profile, user } = await googleUserFromCallback(request);
+    if (profile === "organizer") {
+      const organizer = await findGoogleOrganizer(user);
+      if (!organizer) throw new HttpError(403, "ORGANIZER_ACCOUNT_REQUIRED", "Este e-mail não possui uma conta de organizador.");
+      const token = createAccessToken(organizer.id, "ORGANIZER", organizer.sessionVersion);
+      clearGoogleOAuthState(response);
+      response.redirect(302, `${env.frontendUrl}/login/organizer#google_token=${encodeURIComponent(token)}`);
+      return;
+    }
+    const participant = await findOrCreateGoogleParticipant(user);
+    const token = createAccessToken(participant.id, "PARTICIPANT", participant.sessionVersion);
+    clearGoogleOAuthState(response);
+    response.redirect(302, `${env.frontendUrl}/login/participant#google_token=${encodeURIComponent(token)}`);
+  } catch (error) { clearGoogleOAuthState(response); next(error); }
 });
 
 publicRouter.post("/auth/forgot-password", async (request, response, next) => {
