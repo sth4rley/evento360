@@ -20,6 +20,7 @@ const resendEnvironment = vi.hoisted(() => {
 import {
   buildRegistrationConfirmationEmail,
   buildTicketEmailHtml,
+  buildWaitlistEmail,
   resend,
   sendRegistrationConfirmationEmail,
   sendTicketEmail,
@@ -83,6 +84,52 @@ afterAll(() => {
     "PUBLIC_APP_URL",
     resendEnvironment.previous.publicAppUrl,
   );
+});
+
+describe("Resend waitlist notice", () => {
+  const waitlisted: CreatedRegistration = {
+    ...created,
+    registration: {
+      ...created.registration,
+      status: RegistrationStatus.WAITLISTED,
+      waitlistPosition: 3,
+    },
+  };
+
+  it("tells the participant their position without promising a seat", () => {
+    const { subject, html } = buildWaitlistEmail(
+      waitlisted,
+      resendEnvironment.publicAppUrl,
+    );
+    const cancellationUrl = `${resendEnvironment.publicAppUrl}/registration/cancel/${created.registration.cancellationToken}`;
+
+    expect(subject).toBe(`Você está na lista de espera — ${created.event.name}`);
+    expect(visibleText(html)).toContain("3º");
+    expect(html).toContain(created.registration.confirmationCode);
+    expect(html).toContain(`href="${cancellationUrl}"`);
+    expect(html).toContain("Sair da lista de espera");
+    expect(html).not.toMatch(/inscrição confirmada/i);
+    expect(visibleText(html)).not.toContain(
+      created.registration.cancellationToken,
+    );
+  });
+
+  it("escapes participant and event data", () => {
+    const { html } = buildWaitlistEmail(
+      {
+        event: { ...waitlisted.event, name: "<script>alert(1)</script>" },
+        registration: {
+          ...waitlisted.registration,
+          participantName: '<img src=x onerror="alert(1)">',
+        },
+      },
+      resendEnvironment.publicAppUrl,
+    );
+
+    expect(html).not.toContain("<script>alert(1)</script>");
+    expect(html).not.toContain("<img src=x");
+    expect(html).toContain("&lt;script&gt;alert(1)&lt;/script&gt;");
+  });
 });
 
 describe("Resend registration confirmation", () => {

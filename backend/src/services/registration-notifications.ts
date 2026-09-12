@@ -1,9 +1,14 @@
+import { RegistrationStatus } from "@prisma/client";
 import type { CreatedRegistration } from "../domain/registrations.js";
 import { safeIntegrationErrorDetails } from "./integration-error.js";
-import { sendRegistrationCreatedWebhook } from "./n8n.js";
+import {
+  type RegistrationWebhookType,
+  sendRegistrationCreatedWebhook,
+} from "./n8n.js";
 import {
   sendRegistrationConfirmationEmail,
   sendTicketEmail,
+  sendWaitlistEmail,
 } from "./resend.js";
 
 type RegistrationIntegration = "resend" | "n8n";
@@ -12,8 +17,28 @@ export function buildTicketQrCodeUrl(confirmationCode: string): string {
   return `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(confirmationCode)}`;
 }
 
-export async function notifyRegistrationCreated(
+async function runIntegrations(
+  registrationId: string,
+  integrations: Array<{ integration: RegistrationIntegration; run: () => Promise<void> }>,
+): Promise<void> {
+  const results = await Promise.allSettled(
+    integrations.map(({ run }) => Promise.resolve().then(run)),
+  );
+
+  results.forEach((result, index) => {
+    if (result.status === "rejected") {
+      console.error({
+        integration: integrations[index].integration,
+        registrationId,
+        ...safeIntegrationErrorDetails(result.reason),
+      });
+    }
+  });
+}
+
+async function notifyConfirmedSeat(
   created: CreatedRegistration,
+  webhookType: RegistrationWebhookType,
 ): Promise<void> {
   const qrCodeUrl = buildTicketQrCodeUrl(created.registration.confirmationCode);
 
@@ -38,30 +63,38 @@ export async function notifyRegistrationCreated(
       });
   }
 
-  const integrations: Array<{
-    integration: RegistrationIntegration;
-    run: () => Promise<void>;
-  }> = [
+  await runIntegrations(created.registration.id, [
     {
       integration: "resend",
       run: () => sendRegistrationConfirmationEmail(created),
     },
     {
       integration: "n8n",
-      run: () => sendRegistrationCreatedWebhook(created),
+      run: () => sendRegistrationCreatedWebhook(created, webhookType),
     },
-  ];
-  const results = await Promise.allSettled(
-    integrations.map(({ run }) => Promise.resolve().then(run)),
-  );
+  ]);
+}
 
-  results.forEach((result, index) => {
-    if (result.status === "rejected") {
-      console.error({
-        integration: integrations[index].integration,
-        registrationId: created.registration.id,
-        ...safeIntegrationErrorDetails(result.reason),
-      });
-    }
-  });
+export async function notifyRegistrationCreated(
+  created: CreatedRegistration,
+): Promise<void> {
+  if (created.registration.status === RegistrationStatus.WAITLISTED) {
+    // Sem vaga garantida ainda: nada de ingresso, apenas o aviso da fila.
+    await runIntegrations(created.registration.id, [
+      { integration: "resend", run: () => sendWaitlistEmail(created) },
+      {
+        integration: "n8n",
+        run: () => sendRegistrationCreatedWebhook(created, "registration.waitlisted"),
+      },
+    ]);
+    return;
+  }
+
+  await notifyConfirmedSeat(created, "registration.created");
+}
+
+export async function notifyRegistrationPromoted(
+  created: CreatedRegistration,
+): Promise<void> {
+  await notifyConfirmedSeat(created, "registration.promoted");
 }
