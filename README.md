@@ -91,6 +91,28 @@ npm run dev
 `VITE_API_URL` configura o backend usado pelo frontend. Toda variável `VITE_*`
 fica acessível no navegador: nunca coloque senhas ou chaves nesse arquivo.
 
+### Tudo em containers (opcional)
+
+Para subir banco, API e interface juntos, sem rodar nada na máquina:
+
+```powershell
+docker compose --profile app up -d --build postgres backend frontend
+```
+
+Os serviços `backend` e `frontend` estão no profile `app` e só sobem com essa
+opção; `docker compose up -d` continua subindo apenas postgres, n8n e waha.
+Nomear os serviços evita subir n8n e waha junto, que são opcionais.
+A aplicação fica em http://localhost:5173 e a API em http://localhost:3000, os
+mesmos endereços do fluxo com `npm run dev`. Não use os dois ao mesmo tempo,
+para as portas não conflitarem. O `.env` da raiz precisa de `POSTGRES_PASSWORD`
+e de um `AUTH_TOKEN_SECRET` próprio.
+
+As migrations são aplicadas quando o backend sobe. O seed exige banco local e
+por isso continua sendo executado da máquina, a partir de `backend`, usando a
+porta publicada do Postgres. `VITE_API_URL` é resolvida na construção da imagem
+do frontend, então alterá-la exige `--build`. Para encerrar, use
+`docker compose --profile app down`.
+
 ### Contas de demonstração
 
 | Perfil | Login | Senha |

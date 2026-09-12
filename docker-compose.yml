@@ -10,6 +10,47 @@ services:
       - "127.0.0.1:5434:5432"
     volumes:
       - evento360-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-evento360} -d ${POSTGRES_DB:-evento360}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # Os serviços abaixo só sobem com "--profile app"; sem o profile, o Compose
+  # continua subindo apenas postgres, n8n e waha, como antes.
+  backend:
+    profiles: ["app"]
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: development
+      PORT: 3000
+      # Na rede do Compose o banco atende em postgres:5432, não em 127.0.0.1:5434.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-evento360}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-evento360}?schema=public
+      AUTH_TOKEN_SECRET: ${AUTH_TOKEN_SECRET:?Configure AUTH_TOKEN_SECRET no .env}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost:5173}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      N8N_REGISTRATION_WEBHOOK_URL: ${N8N_REGISTRATION_WEBHOOK_URL:-}
+      N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  frontend:
+    profiles: ["app"]
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "127.0.0.1:5173:80"
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
