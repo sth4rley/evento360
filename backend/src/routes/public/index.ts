@@ -21,8 +21,10 @@ import {
 import { createAccessToken } from "../../auth/token.js";
 import { serializePublicEvent } from "../../domain/public-events.js";
 import {
+  cancelRegistration,
   createRegistration,
   parseRegistrationInput,
+  waitlistPosition,
 } from "../../domain/registrations.js";
 import { HttpError } from "../../errors/http-error.js";
 import { prisma } from "../../lib/prisma.js";
@@ -30,7 +32,10 @@ import {
   optionalParticipantAuth,
   requireParticipantAuth,
 } from "../../middlewares/require-auth.js";
-import { notifyRegistrationCreated } from "../../services/registration-notifications.js";
+import {
+  notifyRegistrationCreated,
+  notifyRegistrationPromoted,
+} from "../../services/registration-notifications.js";
 
 export const publicRouter = Router();
 
@@ -335,6 +340,7 @@ publicRouter.post(
           confirmationCode: registration.registration.confirmationCode,
           cancellationToken: registration.registration.cancellationToken,
           createdAt: registration.registration.createdAt,
+          waitlistPosition: registration.registration.waitlistPosition ?? null,
         },
       });
     } catch (error) {
@@ -348,6 +354,8 @@ publicRouter.get("/registrations/confirmation/:confirmationCode", async (request
     const registration = await prisma.registration.findUnique({
       where: { confirmationCode: request.params.confirmationCode.trim().toUpperCase() },
       select: {
+        id: true,
+        eventId: true,
         participantName: true,
         confirmationCode: true,
         status: true,
@@ -369,7 +377,16 @@ publicRouter.get("/registrations/confirmation/:confirmationCode", async (request
       throw new HttpError(404, "REGISTRATION_NOT_FOUND", "Inscrição não encontrada");
     }
 
-    response.json({ registration });
+    const { id, eventId, ...publicRegistration } = registration;
+    response.json({
+      registration: {
+        ...publicRegistration,
+        waitlistPosition:
+          registration.status === "WAITLISTED"
+            ? await waitlistPosition(prisma, { id, eventId, createdAt: registration.createdAt })
+            : null,
+      },
+    });
   } catch (error) {
     next(error);
   }
@@ -399,25 +416,18 @@ publicRouter.get("/registrations/cancel/:cancellationToken", async (request, res
 
 publicRouter.post("/registrations/cancel/:cancellationToken", async (request, response, next) => {
   try {
-    const cancellationToken = request.params.cancellationToken;
-    const existing = await prisma.registration.findUnique({
-      where: { cancellationToken },
-      select: { id: true, status: true },
-    });
+    const result = await cancelRegistration(request.params.cancellationToken);
 
-    if (!existing) {
+    if (!result) {
       throw new HttpError(404, "REGISTRATION_NOT_FOUND", "Inscrição não encontrada");
     }
 
-    if (existing.status === "ACTIVE") {
-      await prisma.registration.updateMany({
-        where: { id: existing.id, status: "ACTIVE" },
-        data: { status: "CANCELLED", cancelledAt: new Date() },
-      });
-    }
+    // A vaga liberada já foi repassada à fila dentro da transação; os avisos
+    // saem só depois do commit, como na criação da inscrição.
+    await Promise.all(result.promoted.map(notifyRegistrationPromoted));
 
     const registration = await prisma.registration.findUniqueOrThrow({
-      where: { id: existing.id },
+      where: { id: result.registrationId },
       select: {
         participantName: true,
         status: true,

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../src/services/resend.js", () => ({
   sendRegistrationConfirmationEmail: vi.fn().mockResolvedValue(undefined),
   sendTicketEmail: vi.fn().mockResolvedValue({ success: true }),
+  sendWaitlistEmail: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("../src/services/n8n.js", () => ({
@@ -11,19 +12,24 @@ vi.mock("../src/services/n8n.js", () => ({
 }));
 
 import type { CreatedRegistration } from "../src/domain/registrations.js";
+import { sendRegistrationCreatedWebhook } from "../src/services/n8n.js";
 import {
   buildTicketQrCodeUrl,
   notifyRegistrationCreated,
+  notifyRegistrationPromoted,
 } from "../src/services/registration-notifications.js";
 import {
   sendRegistrationConfirmationEmail,
   sendTicketEmail,
+  sendWaitlistEmail,
 } from "../src/services/resend.js";
 
 const mockSendRegistrationConfirmationEmail = vi.mocked(
   sendRegistrationConfirmationEmail,
 );
 const mockSendTicketEmail = vi.mocked(sendTicketEmail);
+const mockSendWaitlistEmail = vi.mocked(sendWaitlistEmail);
+const mockSendWebhook = vi.mocked(sendRegistrationCreatedWebhook);
 
 describe("registration notifications service", () => {
   const fakeCreatedRegistration: CreatedRegistration = {
@@ -91,5 +97,40 @@ describe("registration notifications service", () => {
       expect(consoleSpy).toHaveBeenCalled();
     });
     consoleSpy.mockRestore();
+  });
+
+  it("sends only the waitlist notice, without a ticket, for a waitlisted registration", async () => {
+    const waitlisted: CreatedRegistration = {
+      ...fakeCreatedRegistration,
+      registration: {
+        ...fakeCreatedRegistration.registration,
+        status: RegistrationStatus.WAITLISTED,
+        waitlistPosition: 2,
+      },
+    };
+
+    await notifyRegistrationCreated(waitlisted);
+
+    expect(mockSendWaitlistEmail).toHaveBeenCalledWith(waitlisted);
+    expect(mockSendWebhook).toHaveBeenCalledWith(waitlisted, "registration.waitlisted");
+    expect(mockSendRegistrationConfirmationEmail).not.toHaveBeenCalled();
+    expect(mockSendTicketEmail).not.toHaveBeenCalled();
+  });
+
+  it("sends the ticket and confirmation when a waitlisted registration is promoted", async () => {
+    await notifyRegistrationPromoted(fakeCreatedRegistration);
+
+    await vi.waitFor(() => {
+      expect(mockSendTicketEmail).toHaveBeenCalledOnce();
+    });
+    expect(mockSendRegistrationConfirmationEmail).toHaveBeenCalledWith(fakeCreatedRegistration);
+    expect(mockSendWebhook).toHaveBeenCalledWith(fakeCreatedRegistration, "registration.promoted");
+    expect(mockSendWaitlistEmail).not.toHaveBeenCalled();
+  });
+
+  it("keeps the created webhook type for confirmed registrations", async () => {
+    await notifyRegistrationCreated(fakeCreatedRegistration);
+
+    expect(mockSendWebhook).toHaveBeenCalledWith(fakeCreatedRegistration, "registration.created");
   });
 });

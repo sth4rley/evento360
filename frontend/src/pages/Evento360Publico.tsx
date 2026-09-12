@@ -205,7 +205,7 @@ export function Evento360Publico({ accountPath = "/login", hasAccount = false, o
                   <img alt="" src={imageForEvent(event, index)} />
                   <span className="catalog-cover-shade" />
                   <span className="catalog-card-badge">{category}</span>
-                  {event.isFull ? <span className="catalog-card-tag">Evento lotado</span> : event.availableSeats <= Math.max(10, Math.round(event.capacity * .15)) ? <span className="catalog-card-tag"><AppIcon name="sparkles" size={13} /> Últimas vagas</span> : null}
+                  {event.isFull ? <span className="catalog-card-tag">Lotado · lista de espera</span> : event.availableSeats <= Math.max(10, Math.round(event.capacity * .15)) ? <span className="catalog-card-tag"><AppIcon name="sparkles" size={13} /> Últimas vagas</span> : null}
                 </button>
                 <button className="catalog-event-body" onClick={() => onNavigate(`/event/${event.publicId}`)} type="button">
                   <span className="catalog-date"><b>{date.day}</b><small>{date.month}</small></span>
@@ -213,7 +213,7 @@ export function Evento360Publico({ accountPath = "/login", hasAccount = false, o
                     <strong>{event.name}</strong>
                     <span><AppIcon name="map-pin" size={15} /> {event.location}</span>
                     <span><AppIcon name="clock" size={15} /> {date.time} · Vale do São Francisco</span>
-                    <span className="catalog-event-meta"><b>Inscrição online</b><small>{event.isFull ? "Lotado" : `${event.availableSeats} vagas`}</small></span>
+                    <span className="catalog-event-meta"><b>Inscrição online</b><small>{event.isFull ? "Lista de espera" : `${event.availableSeats} vagas`}</small></span>
                   </span>
                 </button>
               </article>
