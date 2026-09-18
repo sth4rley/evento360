@@ -21,6 +21,8 @@ import {
   type UserRole,
 } from "./routing";
 import "./styles.css";
+import { money, priceLabel, parseReais } from "./services/money";
+import { CheckoutPage, FinancialPanel, savePayment, type PaymentView } from "./pages/Payments";
 
 type ParticipantAccount = {
   id: string;
@@ -42,6 +44,8 @@ type AdminEvent = {
   date: string;
   location: string;
   capacity: number;
+  isPaid: boolean;
+  priceInCents: number | null;
   status: "DRAFT" | "PUBLISHED";
   publicId: string;
   publishedAt: string | null;
@@ -54,6 +58,8 @@ type PublicEvent = {
   date: string;
   location: string;
   capacity: number;
+  isPaid: boolean;
+  priceInCents: number | null;
   availableSeats: number;
   isFull: boolean;
 };
@@ -107,6 +113,8 @@ type ParticipantEventRegistration = {
     date: string;
     location: string;
     capacity: number;
+  isPaid: boolean;
+  priceInCents: number | null;
     available: boolean;
   };
 };
@@ -363,11 +371,12 @@ function ResetPasswordPage({ profile, token }: { profile: AccountProfile; token:
   </AuthShell>;
 }
 
-function AdminLayout({ organizer, children, active, eventId, onLogout }: { organizer: Organizer; children: ReactNode; active: "events" | "new" | "participants" | "checkin"; eventId?: string; onLogout: () => void }) {
+function AdminLayout({ organizer, children, active, eventId, onLogout }: { organizer: Organizer; children: ReactNode; active: "events" | "new" | "participants" | "checkin" | "finance"; eventId?: string; onLogout: () => void }) {
   return <div className="admin-layout">
     <aside className="sidebar">
       <BrandLogo dark onClick={() => navigate("/admin/events")} />
       <nav className="sidebar-menu">
+        <button onClick={() => navigate("/admin/financial")} type="button"><AppIcon name="ticket" /><span>Financeiro</span></button>
         <button className={active === "events" ? "active" : ""} onClick={() => navigate("/admin/events")} title="Meus eventos" type="button"><AppIcon name="home" /><span>Meus eventos</span></button>
         <button className={active === "new" ? "active" : ""} onClick={() => navigate("/admin/events/new")} title="Criar evento" type="button"><AppIcon name="plus" /><span>Criar evento</span></button>
         <button className={active === "participants" ? "active" : ""} onClick={() => navigate(eventId ? `/admin/events/${eventId}/participants` : paths.adminParticipants)} title="Participantes" type="button"><AppIcon name="users" /><span>Participantes</span></button>
@@ -425,7 +434,7 @@ function EventListPage({ organizer, onLogout }: { organizer: Organizer; onLogout
     <div className="event-grid">{events.map((event, index) => <article className="event-card" key={event.id}>
       <div className={`event-cover ${event.status === "DRAFT" ? "event-cover-draft" : ""}`}><img alt="" src={imageForEvent(event, index)} /></div>
       <span className={`badge ${event.status === "PUBLISHED" ? "badge-blue" : "badge-gray"}`}>{event.status === "PUBLISHED" ? "Publicado" : "Rascunho"}</span>
-      <h3>{event.name}</h3>
+      <h3>{event.name}</h3><strong>{priceLabel(event)}</strong>
       <div className="event-info"><span><AppIcon name="calendar" size={17} /> {dateFormat.format(new Date(event.date))}</span><span><AppIcon name="map-pin" size={17} /> {event.location}</span><span><AppIcon name="users" size={17} /> Capacidade para {event.capacity} pessoas</span></div>
       <div className="button-row"><Button className="button-primary" onClick={() => navigate(`/admin/events/${event.id}`)}>Gerenciar</Button><Button className="button-secondary" onClick={() => navigate(`/admin/events/${event.id}/edit`)}>Editar</Button>{event.status === "PUBLISHED" ? <Button className="button-secondary" onClick={() => navigate(`/event/${event.publicId}`)}>Ver página</Button> : null}<Button className="button-danger" disabled={deletingId === event.id} onClick={() => setConfirmDeleteId(event.id)}>Remover</Button></div>
       {confirmDeleteId === event.id ? <div className="event-delete-confirm" role="alert"><strong>Remover este evento?</strong><p>Ele sairá da sua lista e não ficará mais disponível ao público.</p><div className="button-row"><Button className="button-danger" disabled={deletingId === event.id} onClick={() => removeEvent(event.id)}>{deletingId === event.id ? "Removendo…" : "Confirmar remoção"}</Button><Button className="button-secondary" disabled={deletingId === event.id} onClick={() => setConfirmDeleteId(null)}>Cancelar</Button></div></div> : null}
@@ -459,7 +468,7 @@ function AdminEventSelectorPage({ mode, organizer, onLogout }: { mode: "particip
     <div className="event-grid">{events.map((event, index) => <article className="event-card" key={event.id}>
       <div className={`event-cover ${event.status === "DRAFT" ? "event-cover-draft" : ""}`}><img alt="" src={imageForEvent(event, index)} /></div>
       <span className={`badge ${event.status === "PUBLISHED" ? "badge-blue" : "badge-gray"}`}>{event.status === "PUBLISHED" ? "Publicado" : "Rascunho"}</span>
-      <h3>{event.name}</h3>
+      <h3>{event.name}</h3><strong>{priceLabel(event)}</strong>
       <div className="event-info"><span><AppIcon name="calendar" size={17} /> {dateFormat.format(new Date(event.date))}</span><span><AppIcon name="map-pin" size={17} /> {event.location}</span></div>
       <Button className="button-primary" onClick={() => navigate(`/admin/events/${event.id}/${participantsMode ? "participants" : "check-in"}`)}>{participantsMode ? <><AppIcon name="users" size={17} /> Ver participantes</> : <><AppIcon name="checkin" size={17} /> Abrir check-in</>}</Button>
     </article>)}</div>
@@ -487,7 +496,7 @@ function locateMockAddress(query: string): MockAddress {
   };
 }
 
-type EventFormValues = { name: string; date: string; location: string; capacity: number };
+type EventFormValues = { name: string; date: string; location: string; capacity: number; isPaid: boolean; priceInCents: number | null };
 
 // `datetime-local` trabalha no fuso do navegador, sem offset.
 function toDateTimeLocal(value: string) {
@@ -497,6 +506,8 @@ function toDateTimeLocal(value: string) {
 }
 
 function EventForm({ initial, submitLabel, submittingLabel, onSubmit }: { initial?: AdminEvent; submitLabel: string; submittingLabel: string; onSubmit: (values: EventFormValues) => Promise<void> }) {
+  const [isPaid, setIsPaid] = useState(initial?.isPaid ?? false);
+  const [price, setPrice] = useState(initial?.priceInCents ? money(initial.priceInCents) : "");
   const [name, setName] = useState(initial?.name ?? "");
   const [date, setDate] = useState(initial ? toDateTimeLocal(initial.date) : "");
   const [location, setLocation] = useState(initial?.location ?? "");
@@ -515,16 +526,19 @@ function EventForm({ initial, submitLabel, submittingLabel, onSubmit }: { initia
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const priceInCents = isPaid ? parseReais(price) : null;
+    if (isPaid && (!priceInCents || priceInCents <= 0)) { setError("Informe um valor positivo em reais, por exemplo R$ 50,00."); return; }
     const parsedCapacity = Number(capacity);
     if (!Number.isInteger(parsedCapacity) || parsedCapacity < 1) { setError("Informe uma capacidade inteira maior que zero."); return; }
     if (!location) { setError("Busque e confirme o local do evento no mapa."); return; }
     setLoading(true); setError(null);
     try {
-      await onSubmit({ name, date: new Date(date).toISOString(), location, capacity: parsedCapacity });
+      await onSubmit({ name, date: new Date(date).toISOString(), location, capacity: parsedCapacity, isPaid, priceInCents });
     } catch (requestError) { setError(messageFrom(requestError)); } finally { setLoading(false); }
   }
   return <form className="form-card" onSubmit={submit}>
-      <div className="form-grid"><Field label="Nome do evento"><input disabled={loading} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Conecta Vale 2026" required value={name} /></Field><div className="location-picker"><span>Local do evento</span><div className="address-search"><input disabled={loading} onChange={(event) => setAddressQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchAddress(); } }} placeholder="Busque por rua, bairro ou ponto de referência" value={addressQuery} /><Button className="button-secondary" disabled={loading} onClick={searchAddress} type="button">Buscar no mapa</Button></div><div className="map-mock" role="img" aria-label="Mapa simulado para localização do evento"><span className="map-status">{address ? `Marcador posicionado em ${address.label}.` : location ? `Local atual: ${location}. Busque um endereço para alterá-lo.` : "Busque um endereço para posicionar o marcador."}</span>{address ? <i className="map-marker" style={{ left: address.x, top: address.y }} /> : null}</div><div className="address-details"><Field label="Rua"><input readOnly value={address?.street ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Bairro"><input readOnly value={address?.neighborhood ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Cidade"><input readOnly value={address?.city ?? ""} placeholder="Preenchido pela busca" /></Field></div><Field label="Local confirmado"><input readOnly required value={location} placeholder="O local selecionado aparecerá aqui" /></Field></div><Field label="Data e horário"><input disabled={loading} onChange={(event) => setDate(event.target.value)} required type="datetime-local" value={date} /></Field><Field label="Capacidade máxima"><input disabled={loading} min="1" onChange={(event) => setCapacity(event.target.value)} placeholder="120" required step="1" type="number" value={capacity} /></Field></div>
+      <fieldset disabled={loading}><legend>Tipo de inscrição</legend><label><input type="radio" name="pricing" checked={!isPaid} onChange={() => setIsPaid(false)} /> Evento gratuito</label><label><input type="radio" name="pricing" checked={isPaid} onChange={() => setIsPaid(true)} /> Evento pago</label>{isPaid && <Field label="Valor da inscrição (R$)"><input inputMode="decimal" placeholder="R$ 50,00" required value={price} onChange={e => setPrice(e.target.value)} onBlur={() => { const cents = parseReais(price); if(cents !== null) setPrice(money(cents)); }} /></Field>}<p>Prévia: {isPaid ? money(parseReais(price) ?? 0) : "Gratuito"}</p></fieldset>
+      <div className="form-grid"><Field label="Nome do evento"><input disabled={loading} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Conecta Vale 2026" required value={name} /></Field><div className="location-picker"><span>Local do evento</span><div className="address-search"><input disabled={loading} onChange={(event) => setAddressQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchAddress(); } }} placeholder="Busque por rua, bairro ou ponto de referência" value={addressQuery} /><Button className="button-secondary" disabled={loading} onClick={searchAddress} type="button">Buscar no mapa</Button></div><div className="map-mock" role="img" aria-label="Mapa para localização do evento"><span className="map-status">{address ? `Marcador posicionado em ${address.label}.` : location ? `Local atual: ${location}. Busque um endereço para alterá-lo.` : "Busque um endereço para posicionar o marcador."}</span>{address ? <i className="map-marker" style={{ left: address.x, top: address.y }} /> : null}</div><div className="address-details"><Field label="Rua"><input readOnly value={address?.street ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Bairro"><input readOnly value={address?.neighborhood ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Cidade"><input readOnly value={address?.city ?? ""} placeholder="Preenchido pela busca" /></Field></div><Field label="Local confirmado"><input readOnly required value={location} placeholder="O local selecionado aparecerá aqui" /></Field></div><Field label="Data e horário"><input disabled={loading} onChange={(event) => setDate(event.target.value)} required type="datetime-local" value={date} /></Field><Field label="Capacidade máxima"><input disabled={loading} min="1" onChange={(event) => setCapacity(event.target.value)} placeholder="120" required step="1" type="number" value={capacity} /></Field></div>
       {error ? <Alert>{error}</Alert> : null}
       <footer className="form-actions"><Button className="button-secondary" onClick={() => navigate(initial ? `/admin/events/${initial.id}` : "/admin/events")} type="button">Cancelar</Button><Button className="button-primary" disabled={loading} type="submit">{loading ? submittingLabel : submitLabel}</Button></footer>
     </form>;
@@ -718,8 +732,8 @@ function PublicEventPage({ publicId }: { publicId: string }) {
       </article>
       <aside className="public-info-card public-registration">
         <span className={`badge ${event.isFull ? "badge-gold" : "badge-green"}`}>{event.isFull ? "Evento lotado" : `${event.availableSeats} vagas disponíveis`}</span>
-        <h2>Garanta sua vaga</h2>
-        <p>{event.isFull ? "As vagas acabaram, mas você pode entrar na lista de espera e ser chamado automaticamente se alguém cancelar." : "A inscrição online leva menos de 1 minuto."}</p>
+        <h2>Garanta sua vaga</h2><strong>{priceLabel(event)}</strong>
+        <p>{event.isFull ? "As vagas acabaram. Entre na lista de espera; em eventos pagos, acompanhe a vaga e confirme o pagamento quando ela for liberada." : "A inscrição online leva menos de 1 minuto."}</p>
         <Button className="button-primary button-block" onClick={() => navigate(`/event/${event.publicId}/register`)}>{event.isFull ? "Entrar na lista de espera" : "Inscrever-se"} <AppIcon name="arrow-right" size={18} /></Button>
         <small>Evento360 · Vale do São Francisco</small>
       </aside>
@@ -732,8 +746,23 @@ function RegistrationPage({ publicId, participant }: { publicId: string; partici
   const [name, setName] = useState(participant?.name ?? ""); const [email, setEmail] = useState(participant?.email ?? ""); const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null); const [loading, setLoading] = useState(false);
   useEffect(() => { let mounted = true; apiRequest<{ event: PublicEvent }>(`/api/public/events/${publicId}`).then((result) => mounted && setEvent(result.event)).catch((requestError) => mounted && setError(messageFrom(requestError))); return () => { mounted = false; }; }, [publicId]);
-  async function submit(form: FormEvent<HTMLFormElement>) { form.preventDefault(); setLoading(true); setError(null); try { const result = await apiRequest<{ registration: { confirmationCode: string; cancellationToken: string } }>(`/api/public/events/${publicId}/registrations`, { method: "POST", auth: participant ? "participant" : undefined, body: JSON.stringify({ participantName: name, participantEmail: email, participantPhone: phone, joinWaitlist: Boolean(event?.isFull) }) }); navigate(`/registration/${result.registration.confirmationCode}?cancel=${result.registration.cancellationToken}`); } catch (requestError) { if (requestError instanceof ApiError && requestError.code === "EVENT_FULL") { setError("As vagas acabaram enquanto você preenchia o formulário. Você ainda pode entrar na lista de espera."); apiRequest<{ event: PublicEvent }>(`/api/public/events/${publicId}`).then((result) => setEvent(result.event)).catch(() => undefined); } else { setError(messageFrom(requestError)); } } finally { setLoading(false); } }
-  return <PublicLayout back={() => navigate(`/event/${publicId}`)}><section className="registration-wrap"><form className="form-card" onSubmit={submit}><span className="badge badge-blue">{event?.name || "Inscrição"}</span><h1>{event?.isFull ? "Entrar na lista de espera" : "Faça sua inscrição"}</h1>{event?.isFull ? <Alert kind="success">O evento está lotado. Você entrará na fila e, se uma vaga abrir, sua inscrição será confirmada automaticamente.</Alert> : null}<p>{participant ? `Você está entrando como ${participant.name}. Seus dados de conta serão usados com segurança.` : "Preencha seus dados. Você não precisa criar uma conta."}</p><Field label="Nome completo"><input disabled={loading || Boolean(participant)} onChange={(event) => setName(event.target.value)} placeholder="Seu nome" required value={name} /></Field><Field label="E-mail"><input disabled={loading || Boolean(participant)} onChange={(event) => setEmail(event.target.value)} placeholder="voce@email.com" required type="email" value={email} /></Field><Field label="WhatsApp para contato"><input autoComplete="tel" disabled={loading} inputMode="tel" onChange={(event) => setPhone(event.target.value)} placeholder="(87) 99999-9999" required type="tel" value={phone} /></Field>{error ? <Alert>{error}</Alert> : null}<Button className="button-primary button-block" disabled={loading} type="submit">{loading ? "Confirmando…" : event?.isFull ? "Entrar na lista de espera" : "Confirmar inscrição"}</Button></form></section></PublicLayout>;
+  async function submit(form: FormEvent<HTMLFormElement>) { form.preventDefault(); setLoading(true); setError(null); try {
+      if (!event) throw new Error("Aguarde o carregamento do evento.");
+      if (event.isPaid) {
+        const savedId = sessionStorage.getItem(`event-payment:${publicId}`);
+        if (savedId && sessionStorage.getItem(`event-payment-email:${publicId}`) === email.trim().toLowerCase()) {
+          const savedToken = sessionStorage.getItem(`payment:${savedId}`);
+          if (savedToken) {
+            const saved = await apiRequest<{payment: PaymentView}>(`/api/public/payments/${savedId}`, {headers:{"X-Payment-Token": savedToken}}).catch(() => null);
+            if (saved && ["PENDING", "APPROVED"].includes(saved.payment.status)) { savePayment(saved.payment, savedToken); return; }
+          }
+        }
+        const data = await apiRequest<{payment: PaymentView; accessToken: string}>(`/api/public/events/${publicId}/payment-intents`, {method:"POST",auth: participant ? "participant" : undefined,body:JSON.stringify({participantName:name,participantEmail:email,participantPhone:phone})});
+        sessionStorage.setItem(`event-payment-email:${publicId}`, email.trim().toLowerCase());
+        savePayment(data.payment,data.accessToken); return;
+      }
+      const result = await apiRequest<{ registration: { confirmationCode: string; cancellationToken: string } }>(`/api/public/events/${publicId}/registrations`, { method: "POST", auth: participant ? "participant" : undefined, body: JSON.stringify({ participantName: name, participantEmail: email, participantPhone: phone, joinWaitlist: Boolean(event?.isFull) }) }); navigate(`/registration/${result.registration.confirmationCode}?cancel=${result.registration.cancellationToken}`); } catch (requestError) { if (requestError instanceof ApiError && requestError.code === "EVENT_FULL") { setError("As vagas acabaram enquanto você preenchia o formulário. Você ainda pode entrar na lista de espera."); apiRequest<{ event: PublicEvent }>(`/api/public/events/${publicId}`).then((result) => setEvent(result.event)).catch(() => undefined); } else { setError(messageFrom(requestError)); } } finally { setLoading(false); } }
+  return <PublicLayout back={() => navigate(`/event/${publicId}`)}><section className="registration-wrap"><form className="form-card" onSubmit={submit}><span className="badge badge-blue">{event?.name || "Inscrição"}</span><h1>{event?.isFull ? "Entrar na lista de espera" : "Faça sua inscrição"}</h1>{event && <strong>{priceLabel(event)}</strong>}{event?.isPaid && <p className="small-text">A inscrição será confirmada somente após aprovação. Na lista de espera, acompanhe a liberação da vaga na tela de pagamento.</p>}{event?.isFull && !event.isPaid ? <Alert kind="success">O evento está lotado. Você entrará na fila e, se uma vaga abrir, sua inscrição será confirmada automaticamente.</Alert> : null}<p>{participant ? `Você está entrando como ${participant.name}. Seus dados de conta serão usados com segurança.` : "Preencha seus dados. Você não precisa criar uma conta."}</p><Field label="Nome completo"><input disabled={loading || Boolean(participant)} onChange={(event) => setName(event.target.value)} placeholder="Seu nome" required value={name} /></Field><Field label="E-mail"><input disabled={loading || Boolean(participant)} onChange={(event) => setEmail(event.target.value)} placeholder="voce@email.com" required type="email" value={email} /></Field><Field label="WhatsApp para contato"><input autoComplete="tel" disabled={loading} inputMode="tel" onChange={(event) => setPhone(event.target.value)} placeholder="(87) 99999-9999" required type="tel" value={phone} /></Field>{error ? <Alert>{error}</Alert> : null}<Button className="button-primary button-block" disabled={loading || !event} type="submit">{loading ? "Confirmando…" : event?.isPaid ? "Avançar para pagamento" : event?.isFull ? "Entrar na lista de espera" : "Confirmar inscrição"}</Button></form></section></PublicLayout>;
 }
 
 function ConfirmationPage({ code }: { code: string }) {
@@ -747,7 +776,7 @@ function CancellationPage({ token }: { token: string }) {
   const [registration, setRegistration] = useState<CancellableRegistration | null>(null); const [error, setError] = useState<string | null>(null); const [confirming, setConfirming] = useState(false); const [loading, setLoading] = useState(false);
   useEffect(() => { let mounted = true; apiRequest<{ registration: CancellableRegistration }>(`/api/public/registrations/cancel/${token}`).then((result) => mounted && setRegistration(result.registration)).catch((requestError) => mounted && setError(messageFrom(requestError))); return () => { mounted = false; }; }, [token]);
   async function cancel() { setLoading(true); try { const result = await apiRequest<{ registration: CancellableRegistration }>(`/api/public/registrations/cancel/${token}`, { method: "POST" }); setRegistration(result.registration); } catch (requestError) { setError(messageFrom(requestError)); } finally { setLoading(false); } }
-  return <PublicLayout>{error ? <div className="public-error"><h1>Não foi possível cancelar</h1><p>{error}</p></div> : !registration ? <p className="loading-text public-loading">Carregando inscrição…</p> : <section className="success-card"><span className="badge badge-blue">Evento360</span><h1>Cancelar inscrição</h1><p>{registration.participantName}, sua inscrição em <strong>{registration.event.name}</strong> está {registration.status === "ACTIVE" ? "ativa" : registration.status === "WAITLISTED" ? "na lista de espera" : "cancelada"}.</p>{registration.status === "CANCELLED" ? <Alert kind="success">Esta inscrição já foi cancelada.</Alert> : !confirming ? <Button className="button-danger" onClick={() => setConfirming(true)}>{registration.status === "WAITLISTED" ? "Sair da lista de espera" : "Cancelar minha inscrição"}</Button> : <div className="confirmation-box"><strong>Tem certeza?</strong><p>{registration.status === "WAITLISTED" ? "Você perderá sua posição na fila." : "Esta ação libera sua vaga."}</p><div className="button-row centered"><Button className="button-danger" disabled={loading} onClick={cancel}>{loading ? "Cancelando…" : "Confirmar cancelamento"}</Button><Button className="button-secondary" disabled={loading} onClick={() => setConfirming(false)}>Voltar</Button></div></div>}</section>}</PublicLayout>;
+  return <PublicLayout>{error ? <div className="public-error"><h1>Não foi possível cancelar</h1><p>{error}</p></div> : !registration ? <p className="loading-text public-loading">Carregando inscrição…</p> : <section className="success-card"><span className="badge badge-blue">Evento360</span><h1>Cancelar inscrição</h1><p>O cancelamento libera sua vaga no evento.</p><p>{registration.participantName}, sua inscrição em <strong>{registration.event.name}</strong> está {registration.status === "ACTIVE" ? "ativa" : registration.status === "WAITLISTED" ? "na lista de espera" : "cancelada"}.</p>{registration.status === "CANCELLED" ? <Alert kind="success">Esta inscrição já foi cancelada.</Alert> : !confirming ? <Button className="button-danger" onClick={() => setConfirming(true)}>{registration.status === "WAITLISTED" ? "Sair da lista de espera" : "Cancelar minha inscrição"}</Button> : <div className="confirmation-box"><strong>Tem certeza?</strong><p>{registration.status === "WAITLISTED" ? "Você perderá sua posição na fila." : "Esta ação libera sua vaga."}</p><div className="button-row centered"><Button className="button-danger" disabled={loading} onClick={cancel}>{loading ? "Cancelando…" : "Confirmar cancelamento"}</Button><Button className="button-secondary" disabled={loading} onClick={() => setConfirming(false)}>Voltar</Button></div></div>}</section>}</PublicLayout>;
 }
 
 export function App() {
@@ -819,6 +848,8 @@ export function App() {
   }
   if (decision === "forbidden") return <ForbiddenPage />;
 
+  if (route.id === "payment") return <CheckoutPage key={route.params.paymentId} id={route.params.paymentId} />;
+  if (route.id === "admin-financial" && organizer) return <AdminLayout active="finance" organizer={organizer} onLogout={logoutOrganizer}><FinancialPanel /></AdminLayout>;
   if (route.id === "home") return <Evento360Publico accountPath={accountDestination()} hasAccount={Boolean(organizer || participant)} onNavigate={navigate} />;
   if (route.id === "role-selection") return <RoleSelectionPage organizer={organizer} participant={participant} />;
   if (route.id === "organizer-login") return organizer ? <Redirect to={paths.adminEvents} /> : <LoginPage onLoggedIn={(account) => setOrganizer(account as Organizer)} profile="organizer" />;
