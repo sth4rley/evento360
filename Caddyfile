@@ -1,0 +1,7 @@
+evento360.duckdns.org {
+    reverse_proxy frontend:80
+}
+
+event360-api.duckdns.org {
+    reverse_proxy backend:3000
+}

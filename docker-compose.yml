@@ -37,8 +37,8 @@ services:
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       N8N_REGISTRATION_WEBHOOK_URL: ${N8N_REGISTRATION_WEBHOOK_URL:-}
       N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
-    ports:
-      - "127.0.0.1:3000:3000"
+    expose:
+      - "3000"
 
   frontend:
     profiles: ["app"]
@@ -49,8 +49,8 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "127.0.0.1:5173:80"
+    expose:
+      - "80"
 
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
@@ -87,7 +87,25 @@ services:
     volumes:
       - evento360-waha-sessions:/app/.sessions
 
+  caddy:
+    profiles: ["app"]
+    image: caddy:alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
 volumes:
   evento360-postgres:
   evento360-n8n:
   evento360-waha-sessions:
+  caddy_data:
+  caddy_config:

@@ -17,5 +17,6 @@ jobs:
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
             cd ~/evento360
-            git pull origin main
+            git fetch --all
+            git reset --hard origin/main
             sudo docker compose --profile app up -d --build
