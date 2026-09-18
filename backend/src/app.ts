@@ -9,6 +9,7 @@ import { publicRouter } from "./routes/public/index.js";
 
 export const app = express();
 
+app.set("trust proxy", 1);
 app.disable("x-powered-by");
 app.use(helmet({ strictTransportSecurity: env.nodeEnv === "production" ? undefined : false }));
 app.use((_request, response, next) => {
