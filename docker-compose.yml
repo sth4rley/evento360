@@ -55,14 +55,14 @@ services:
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:5678:5678"
+    expose:
+      - "5678"
     environment:
       N8N_HOST: localhost
       N8N_PORT: 5678
-      N8N_PROTOCOL: http
-      N8N_EDITOR_BASE_URL: http://localhost:5678
-      N8N_WEBHOOK_URL: http://localhost:5678/
+      N8N_PROTOCOL: https
+      N8N_EDITOR_BASE_URL: https://evento360-n8n.duckdns.org
+      N8N_WEBHOOK_URL: https://evento360-n8n.duckdns.org/
       GENERIC_TIMEZONE: America/Sao_Paulo
       TZ: America/Sao_Paulo
       N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: "true"
@@ -72,8 +72,8 @@ services:
   waha:
     image: devlikeapro/waha:latest
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:3001:3000"
+    expose:
+      - "3000"
     environment:
       WAHA_API_KEY: sha512:${WAHA_API_KEY_SHA512}
       WAHA_DASHBOARD_ENABLED: "true"
@@ -102,6 +102,8 @@ services:
     depends_on:
       - frontend
       - backend
+      - n8n
+      - waha
 
 volumes:
   evento360-postgres:

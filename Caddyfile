@@ -5,3 +5,11 @@ evento360.duckdns.org {
 event360-api.duckdns.org {
     reverse_proxy backend:3000
 }
+
+evento360-n8n.duckdns.org {
+    reverse_proxy n8n:5678
+}
+
+evento360-waha.duckdns.org {
+    reverse_proxy waha:3000
+}
