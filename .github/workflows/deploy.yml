@@ -1,0 +1,21 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main # O deploy será feito sempre que atualizar a branch main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executando deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ubuntu
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          script: |
+            cd ~/evento360
+            git pull origin main
+            sudo docker compose --profile app up -d --build

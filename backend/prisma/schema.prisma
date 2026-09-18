@@ -84,7 +84,6 @@ model Registration {
   createdAt         DateTime           @default(now())
   cancelledAt       DateTime?
   checkedInAt       DateTime?
- HEAD
   promotedAt        DateTime?
 
   @@index([eventId])
