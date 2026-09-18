@@ -19,9 +19,9 @@ jobs:
             cd ~/evento360
             git fetch --all
             git reset --hard origin/main
-            
+
             # Atualiza o email oficial do Resend na nuvem automaticamente
             sed -i 's/^RESEND_FROM_EMAIL=.*/RESEND_FROM_EMAIL="Evento360 <nao-responda@evento360.lat>"/' .env || true
             sed -i 's/^RESEND_FROM_EMAIL=.*/RESEND_FROM_EMAIL="Evento360 <nao-responda@evento360.lat>"/' backend/.env || true
-            
+
             sudo docker compose --profile app up -d --build
