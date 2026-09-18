@@ -60,7 +60,7 @@ services:
     environment:
       N8N_HOST: localhost
       N8N_PORT: 5678
-      N8N_PROTOCOL: https
+      N8N_PROTOCOL: http
       N8N_EDITOR_BASE_URL: https://evento360-n8n.duckdns.org
       N8N_WEBHOOK_URL: https://evento360-n8n.duckdns.org/
       GENERIC_TIMEZONE: America/Sao_Paulo
