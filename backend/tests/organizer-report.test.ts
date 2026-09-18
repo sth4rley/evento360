@@ -58,6 +58,7 @@ describe("Organizer Report Service", () => {
   it("generates CSV and sends email only once", async () => {
     const organizer = await prisma.organizer.create({
       data: { email: "org@example.com", passwordHash: "hash" },
+    });
     const fakeDate = new Date("2026-09-09T18:05:07.327Z");
     
     // Simulate events found by the cron job
