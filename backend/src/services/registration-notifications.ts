@@ -19,7 +19,10 @@ export function buildTicketQrCodeUrl(confirmationCode: string): string {
 
 async function runIntegrations(
   registrationId: string,
-  integrations: Array<{ integration: RegistrationIntegration; run: () => Promise<void> }>,
+  integrations: Array<{
+    integration: RegistrationIntegration;
+    run: () => Promise<void>;
+  }>,
 ): Promise<void> {
   const results = await Promise.allSettled(
     integrations.map(({ run }) => Promise.resolve().then(run)),
@@ -46,13 +49,15 @@ async function notifyConfirmedSeat(
   if (typeof sendTicketEmail === "function") {
     void Promise.resolve()
       .then(() =>
-        sendTicketEmail(
-          created.registration.participantEmail,
-          created.registration.participantName,
-          created.event.name,
-          created.registration.confirmationCode,
-          qrCodeUrl,
-        ),
+        sendTicketEmail({
+          to: created.registration.participantEmail,
+          participantName: created.registration.participantName,
+          eventName: created.event.name,
+          eventDate: created.event.date,
+          eventLocation: created.event.location,
+          ticketCode: created.registration.confirmationCode,
+          qrCode: qrCodeUrl,
+        }),
       )
       .catch((error) => {
         console.error({
@@ -84,7 +89,8 @@ export async function notifyRegistrationCreated(
       { integration: "resend", run: () => sendWaitlistEmail(created) },
       {
         integration: "n8n",
-        run: () => sendRegistrationCreatedWebhook(created, "registration.waitlisted"),
+        run: () =>
+          sendRegistrationCreatedWebhook(created, "registration.waitlisted"),
       },
     ]);
     return;

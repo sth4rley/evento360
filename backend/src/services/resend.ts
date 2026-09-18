@@ -257,6 +257,8 @@ export interface SendTicketEmailParams {
   to: string;
   participantName: string;
   eventName: string;
+  eventDate: Date;
+  eventLocation: string;
   ticketCode: string;
   qrCode: string;
 }
@@ -270,12 +272,20 @@ export type SendTicketEmailResult = {
 export function buildTicketEmailHtml(
   participantName: string,
   eventName: string,
+  eventDate: Date,
+  eventLocation: string,
   ticketCode: string,
   qrCode: string,
 ): string {
   const safeParticipantName = escapeHtml(participantName);
   const safeEventName = escapeHtml(eventName);
+  const safeEventLocation = escapeHtml(eventLocation);
   const safeTicketCode = escapeHtml(ticketCode);
+
+  const formattedDate = new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "full",
+    timeStyle: "short",
+  }).format(eventDate);
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -293,6 +303,9 @@ export function buildTicketEmailHtml(
       .event-subtitle { margin: 8px 0 0 0; font-size: 16px; color: #bfdbfe; font-weight: 400; }
       .content { padding: 32px; }
       .greeting { margin: 0 0 24px; font-size: 16px; line-height: 1.5; color: #334155; }
+      .event-info { margin-bottom: 24px; padding: 16px; background-color: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0; text-align: left; }
+      .event-info p { margin: 0 0 8px; font-size: 14px; color: #475569; }
+      .event-info p:last-child { margin: 0; }
       .ticket-box { padding: 24px; border: 2px dashed #cbd5e1; border-radius: 12px; text-align: center; margin-bottom: 24px; background: #eff6ff; }
       .ticket-label { margin: 0 0 8px; font-size: 13px; font-weight: 700; text-transform: uppercase; color: #64748b; letter-spacing: 0.05em; }
       .ticket-code { margin: 0 0 24px; font-family: Consolas, Monaco, monospace; font-size: 24px; font-weight: 700; letter-spacing: 0.1em; color: #0f172a; text-transform: uppercase; }
@@ -320,19 +333,25 @@ export function buildTicketEmailHtml(
             </div>
             <div class="content">
               <p class="greeting">Olá, <strong>${safeParticipantName}</strong>! Sua presença está confirmada. Aqui está o seu ingresso.</p>
+              
+              <div class="event-info">
+                <p><strong>Quando:</strong> ${escapeHtml(formattedDate)}</p>
+                <p><strong>Onde:</strong> ${safeEventLocation}</p>
+              </div>
+
               <div class="ticket-box">
                 <p class="ticket-label">Código do Ingresso</p>
                 <div class="ticket-code">${safeTicketCode}</div>
                 <div class="qr-container">
                   <img src="${qrCode}" alt="QR Code do Ingresso" class="qr-code-img" width="200" height="200" />
                 </div>
-                <p class="instructions-text">Apresente este QR Code no credenciamento ou envie no chatbot para validar seu acesso.</p>
+                <p class="instructions-text">Tenha este QR Code aberto na tela do celular (ou impresso) para validar seu acesso.</p>
               </div>
               <div style="text-align: left;">
-                <h3 class="instructions-title">Instruções Importantes:</h3>
+                <h3 class="instructions-title">Orientações Importantes:</h3>
                 <ul class="instructions-list">
-                  <li><strong>Documento obrigatório:</strong> É necessária a apresentação de um documento oficial com foto.</li>
-                  <li><strong>Chegue cedo:</strong> Recomendamos chegar com 30 minutos de antecedência.</li>
+                  <li><strong>Documento obrigatório:</strong> É necessária a apresentação de um documento oficial com foto na portaria.</li>
+                  <li><strong>Chegue cedo:</strong> Recomendamos chegar com 15 minutos de antecedência.</li>
                   <li><strong>Ingresso nominal:</strong> Este ingresso é pessoal e intransferível.</li>
                 </ul>
               </div>
@@ -364,43 +383,26 @@ export function buildTicketEmailHtml(
 }
 
 export async function sendTicketEmail(
-  to: string,
-  participantName: string,
-  eventName: string,
-  ticketCode: string,
-  qrCode: string,
-): Promise<SendTicketEmailResult>;
-export async function sendTicketEmail(
   params: SendTicketEmailParams,
-): Promise<SendTicketEmailResult>;
-export async function sendTicketEmail(
-  toOrParams: string | SendTicketEmailParams,
-  participantName?: string,
-  eventName?: string,
-  ticketCode?: string,
-  qrCode?: string,
 ): Promise<SendTicketEmailResult> {
-  let to: string;
-  let name: string;
-  let event: string;
-  let code: string;
-  let qr: string;
+  const {
+    to,
+    participantName,
+    eventName,
+    eventDate,
+    eventLocation,
+    ticketCode,
+    qrCode,
+  } = params;
 
-  if (typeof toOrParams === "object" && toOrParams !== null) {
-    to = toOrParams.to;
-    name = toOrParams.participantName;
-    event = toOrParams.eventName;
-    code = toOrParams.ticketCode;
-    qr = toOrParams.qrCode;
-  } else {
-    to = toOrParams;
-    name = participantName ?? "";
-    event = eventName ?? "";
-    code = ticketCode ?? "";
-    qr = qrCode ?? "";
-  }
-
-  const html = buildTicketEmailHtml(name, event, code, qr);
+  const html = buildTicketEmailHtml(
+    participantName,
+    eventName,
+    eventDate,
+    eventLocation,
+    ticketCode,
+    qrCode,
+  );
   const from =
     process.env.RESEND_FROM_EMAIL ||
     env.resendFromEmail ||
@@ -410,7 +412,7 @@ export async function sendTicketEmail(
     const response = await resend.emails.send({
       from,
       to,
-      subject: `Seu ingresso para ${event} — ${code}`,
+      subject: `Seu ingresso para ${eventName} — ${ticketCode}`,
       html,
     });
 

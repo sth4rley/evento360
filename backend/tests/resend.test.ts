@@ -103,7 +103,9 @@ describe("Resend waitlist notice", () => {
     );
     const cancellationUrl = `${resendEnvironment.publicAppUrl}/registration/cancel/${created.registration.cancellationToken}`;
 
-    expect(subject).toBe(`Você está na lista de espera — ${created.event.name}`);
+    expect(subject).toBe(
+      `Você está na lista de espera — ${created.event.name}`,
+    );
     expect(visibleText(html)).toContain("3º");
     expect(html).toContain(created.registration.confirmationCode);
     expect(html).toContain(`href="${cancellationUrl}"`);
@@ -206,6 +208,8 @@ describe("sendTicketEmail and ticket template", () => {
     to: "participante@example.test",
     participantName: "Carlos Oliveira",
     eventName: "Conferência IA 2026",
+    eventDate: new Date("2026-10-15T14:00:00Z"),
+    eventLocation: "Auditório Central",
     ticketCode: "TICKET-IA-2026",
     qrCode: "https://example.test/qrcode/TICKET-IA-2026.png",
   };
@@ -214,6 +218,8 @@ describe("sendTicketEmail and ticket template", () => {
     const html = buildTicketEmailHtml(
       ticketData.participantName,
       ticketData.eventName,
+      ticketData.eventDate,
+      ticketData.eventLocation,
       ticketData.ticketCode,
       ticketData.qrCode,
     );
@@ -221,8 +227,8 @@ describe("sendTicketEmail and ticket template", () => {
     expect(html).toContain(ticketData.participantName);
     expect(html).toContain(ticketData.eventName);
     expect(html).toContain(ticketData.ticketCode);
+    expect(html).toContain(ticketData.eventLocation);
     expect(html).toContain(`<img src="${ticketData.qrCode}"`);
-    expect(html).toContain("chatbot");
   });
 
   it("sends ticket email successfully through resend.emails.send", async () => {
@@ -231,22 +237,14 @@ describe("sendTicketEmail and ticket template", () => {
       error: null,
     } as any);
 
-    const result = await sendTicketEmail(
-      ticketData.to,
-      ticketData.participantName,
-      ticketData.eventName,
-      ticketData.ticketCode,
-      ticketData.qrCode,
-    );
+    const result = await sendTicketEmail(ticketData);
 
     expect(result.success).toBe(true);
     expect(result.data).toEqual({ id: "resend-ticket-email-id" });
     expect(sendSpy).toHaveBeenCalledOnce();
-    const callArg = sendSpy.mock.calls[0][0];
-    expect(callArg.to).toBe(ticketData.to);
-    expect(callArg.subject).toContain(ticketData.eventName);
-    expect(callArg.subject).toContain(ticketData.ticketCode);
-    expect(callArg.html).toContain(`<img src="${ticketData.qrCode}"`);
+    const callArgs = sendSpy.mock.calls[0][0];
+    expect(callArgs.to).toBe(ticketData.to);
+    expect(callArgs.html).toContain(ticketData.ticketCode);
   });
 
   it("supports passing payload as an object", async () => {

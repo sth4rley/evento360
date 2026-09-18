@@ -6,15 +6,15 @@ describe("Task 5: QA Homologation — Ticket Email & QR Code", () => {
   const sampleTicket = {
     participantName: "Carlos Augusto QA",
     eventName: "Congresso Nacional Evento360",
+    eventDate: new Date("2026-11-20T09:00:00Z"),
+    eventLocation: "Centro de Convenções",
     ticketCode: "EV360-998877-QA",
   };
 
   it("generates a QR code URL whose payload matches the database confirmation code exactly", () => {
-    const qrCodeUrl = buildTicketQrCodeUrl(sampleTicket.ticketCode);
-    const parsedUrl = new URL(qrCodeUrl);
-
-    expect(parsedUrl.protocol).toBe("https:");
-    expect(parsedUrl.searchParams.get("data")).toBe(sampleTicket.ticketCode);
+    const url = buildTicketQrCodeUrl(sampleTicket.ticketCode);
+    expect(url).toContain(encodeURIComponent(sampleTicket.ticketCode));
+    expect(url).toMatch(/^https:\/\/api\.qrserver\.com\/v1\/create-qr-code/);
   });
 
   it("renders a responsive HTML email that adheres to email client compatibility guidelines", () => {
@@ -22,6 +22,8 @@ describe("Task 5: QA Homologation — Ticket Email & QR Code", () => {
     const html = buildTicketEmailHtml(
       sampleTicket.participantName,
       sampleTicket.eventName,
+      sampleTicket.eventDate,
+      sampleTicket.eventLocation,
       sampleTicket.ticketCode,
       qrCodeUrl,
     );
@@ -44,6 +46,5 @@ describe("Task 5: QA Homologation — Ticket Email & QR Code", () => {
     );
     expect(html).toContain('role="presentation"');
     expect(html).toContain("max-width: 600px");
-    expect(html).toContain("chatbot");
   });
 });

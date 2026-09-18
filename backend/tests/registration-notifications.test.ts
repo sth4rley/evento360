@@ -74,13 +74,15 @@ describe("registration notifications service", () => {
     });
 
     const expectedQrCode = buildTicketQrCodeUrl("CONF-ANA-2026");
-    expect(mockSendTicketEmail).toHaveBeenCalledWith(
-      "ana@example.test",
-      "Ana Silva",
-      "Summit de Tecnologia",
-      "CONF-ANA-2026",
-      expectedQrCode,
-    );
+    expect(mockSendTicketEmail).toHaveBeenCalledWith({
+      to: "ana@example.test",
+      participantName: "Ana Silva",
+      eventName: "Summit de Tecnologia",
+      eventDate: fakeCreatedRegistration.event.date,
+      eventLocation: fakeCreatedRegistration.event.location,
+      ticketCode: "CONF-ANA-2026",
+      qrCode: expectedQrCode,
+    });
   });
 
   it("does not crash if sendTicketEmail fails asynchronously", async () => {
@@ -112,7 +114,10 @@ describe("registration notifications service", () => {
     await notifyRegistrationCreated(waitlisted);
 
     expect(mockSendWaitlistEmail).toHaveBeenCalledWith(waitlisted);
-    expect(mockSendWebhook).toHaveBeenCalledWith(waitlisted, "registration.waitlisted");
+    expect(mockSendWebhook).toHaveBeenCalledWith(
+      waitlisted,
+      "registration.waitlisted",
+    );
     expect(mockSendRegistrationConfirmationEmail).not.toHaveBeenCalled();
     expect(mockSendTicketEmail).not.toHaveBeenCalled();
   });
@@ -123,14 +128,22 @@ describe("registration notifications service", () => {
     await vi.waitFor(() => {
       expect(mockSendTicketEmail).toHaveBeenCalledOnce();
     });
-    expect(mockSendRegistrationConfirmationEmail).toHaveBeenCalledWith(fakeCreatedRegistration);
-    expect(mockSendWebhook).toHaveBeenCalledWith(fakeCreatedRegistration, "registration.promoted");
+    expect(mockSendRegistrationConfirmationEmail).toHaveBeenCalledWith(
+      fakeCreatedRegistration,
+    );
+    expect(mockSendWebhook).toHaveBeenCalledWith(
+      fakeCreatedRegistration,
+      "registration.promoted",
+    );
     expect(mockSendWaitlistEmail).not.toHaveBeenCalled();
   });
 
   it("keeps the created webhook type for confirmed registrations", async () => {
     await notifyRegistrationCreated(fakeCreatedRegistration);
 
-    expect(mockSendWebhook).toHaveBeenCalledWith(fakeCreatedRegistration, "registration.created");
+    expect(mockSendWebhook).toHaveBeenCalledWith(
+      fakeCreatedRegistration,
+      "registration.created",
+    );
   });
 });
