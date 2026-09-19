@@ -56,6 +56,7 @@ adminRouter.post("/upload", requireOrganizerAuth, upload.single("cover"), (reque
     if (!request.file) {
       throw new HttpError(400, "FILE_MISSING", "Nenhuma imagem foi enviada");
     }
+    console.log("Upload finalizado:", request.file);
     const coverUrl = `/uploads/${request.file.filename}`;
     response.json({ coverUrl });
   } catch (error) {
