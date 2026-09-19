@@ -26,7 +26,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      NODE_ENV: development
+      NODE_ENV: ${NODE_ENV:-development}
       PORT: 3000
       # Na rede do Compose o banco atende em postgres:5432, não em 127.0.0.1:5434.
       DATABASE_URL: postgresql://${POSTGRES_USER:-evento360}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-evento360}?schema=public
@@ -37,6 +37,11 @@ services:
       RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
       N8N_REGISTRATION_WEBHOOK_URL: ${N8N_REGISTRATION_WEBHOOK_URL:-}
       N8N_WEBHOOK_SECRET: ${N8N_WEBHOOK_SECRET:-}
+      # Credenciais OAuth ficam somente no .env da máquina/servidor.
+      # Nunca adicione os valores reais ao repositório.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_OAUTH_REDIRECT_URI: ${GOOGLE_OAUTH_REDIRECT_URI:-}
     expose:
       - "3000"
 
