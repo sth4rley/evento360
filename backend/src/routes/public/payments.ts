@@ -3,6 +3,7 @@ import { prisma } from "../../lib/prisma.js";
 import { HttpError } from "../../errors/http-error.js";
 import crypto from "node:crypto";
 import { createRegistration } from "../../domain/registrations.js";
+import { notifyRegistrationCreated } from "../../services/registration-notifications.js";
 import { optionalParticipantAuth } from "../../middlewares/require-auth.js";
 
 export const paymentsRouter = Router();
@@ -122,6 +123,8 @@ paymentsRouter.post("/payments/:id/process", async (request: any, response: any,
       },
       include: { event: true, registration: true },
     });
+
+    await notifyRegistrationCreated(registrationRes);
 
     response.json({ payment: serializePayment(updatedPayment) });
   } catch (error) { next(error); }
