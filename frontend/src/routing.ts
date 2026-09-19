@@ -182,7 +182,7 @@ export function matchRoute(pathname: string): RouteMatch {
 
   result = path.match(/^\/payment\/([^/]+)$/);
   if (result) {
-    return matched("payment", "public", { token: decoded(result[1]) });
+    return matched("payment", "public", { paymentId: decoded(result[1]) });
   }
 
   if (path === "/admin/financial") {
