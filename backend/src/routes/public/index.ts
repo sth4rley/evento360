@@ -475,17 +475,5 @@ publicRouter.post("/registrations/cancel/:cancellationToken", async (request, re
   }
 });
 
-// Rotas de pagamento — módulo ainda não implementado.
-// Retornam 404 com mensagem clara para evitar erros genéricos.
-publicRouter.get("/payments/:id", (_request, response) => {
-  response
-    .status(404)
-    .json({ error: { code: "PAYMENT_NOT_FOUND", message: "Módulo de pagamentos ainda não está disponível." } });
-});
-
-publicRouter.post("/payments/:id/:action", (_request, response) => {
-  response
-    .status(404)
-    .json({ error: { code: "PAYMENT_NOT_FOUND", message: "Módulo de pagamentos ainda não está disponível." } });
-});
-
+import { paymentsRouter } from "./payments.js";
+publicRouter.use(paymentsRouter);
