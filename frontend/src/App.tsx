@@ -609,7 +609,7 @@ function EventForm({ initial, submitLabel, submittingLabel, onSubmit }: { initia
         
         <Field label="Capa do Evento (Imagem)">
           <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
-            {coverUrl ? <img src={coverUrl} alt="Capa" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8 }} /> : null}
+            {coverUrl ? <img src={imageForEvent({ name, coverUrl })} alt="Capa" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8 }} /> : null}
             <input type="file" accept="image/*" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileUpload} />
             <Button className="button-secondary" type="button" disabled={uploading || loading} onClick={() => fileInputRef.current?.click()}>
               {uploading ? "Enviando..." : "Anexar Imagem"}
