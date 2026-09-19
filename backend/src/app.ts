@@ -7,7 +7,11 @@ import { errorHandler } from "./middlewares/error-handler.js";
 import { adminRouter } from "./routes/admin/index.js";
 import { publicRouter } from "./routes/public/index.js";
 
+import path from "node:path";
+
 export const app = express();
+
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.set("trust proxy", 1);
 app.disable("x-powered-by");

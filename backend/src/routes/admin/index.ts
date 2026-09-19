@@ -23,8 +23,45 @@ import { env } from "../../config/env.js";
 import { HttpError } from "../../errors/http-error.js";
 import { prisma } from "../../lib/prisma.js";
 import { requireOrganizerAuth } from "../../middlewares/require-auth.js";
+import multer from "multer";
+import path from "node:path";
+import crypto from "node:crypto";
 
 export const adminRouter = Router();
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, path.join(process.cwd(), "uploads"));
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const id = crypto.randomUUID();
+    cb(null, `${id}${ext}`);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith("image/")) {
+      cb(null, true);
+    } else {
+      cb(new HttpError(400, "INVALID_FILE_TYPE", "Apenas imagens são permitidas"));
+    }
+  },
+});
+
+adminRouter.post("/upload", requireOrganizerAuth, upload.single("cover"), (request: any, response: any, next: any) => {
+  try {
+    if (!request.file) {
+      throw new HttpError(400, "FILE_MISSING", "Nenhuma imagem foi enviada");
+    }
+    const coverUrl = `/uploads/${request.file.filename}`;
+    response.json({ coverUrl });
+  } catch (error) {
+    next(error);
+  }
+});
 
 adminRouter.post("/auth/login", async (request, response, next) => {
   try {
@@ -289,6 +326,8 @@ adminRouter.post("/events/:eventId/close", async (request, response, next) => {
     next(error);
   }
 });
+
+
 
 adminRouter.get("/events/:eventId/participants", async (request, response, next) => {
   try {

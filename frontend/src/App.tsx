@@ -1,4 +1,4 @@
-import { ButtonHTMLAttributes, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
+import { ButtonHTMLAttributes, FormEvent, ReactNode, useCallback, useEffect, useMemo, useState, useRef } from "react";
 import {
   ApiError,
   apiRequest,
@@ -43,6 +43,7 @@ type AdminEvent = {
   name: string;
   date: string;
   location: string;
+  coverUrl?: string;
   capacity: number;
   isPaid: boolean;
   priceInCents: number | null;
@@ -57,6 +58,7 @@ type PublicEvent = {
   name: string;
   date: string;
   location: string;
+  coverUrl?: string;
   capacity: number;
   isPaid: boolean;
   priceInCents: number | null;
@@ -112,6 +114,7 @@ type ParticipantEventRegistration = {
     name: string;
     date: string;
     location: string;
+    coverUrl?: string;
     capacity: number;
   isPaid: boolean;
   priceInCents: number | null;
@@ -496,7 +499,7 @@ function locateMockAddress(query: string): MockAddress {
   };
 }
 
-type EventFormValues = { name: string; date: string; location: string; capacity: number; isPaid: boolean; priceInCents: number | null };
+type EventFormValues = { name: string; date: string; location: string; capacity: number; isPaid: boolean; priceInCents: number | null; coverUrl?: string };
 
 // `datetime-local` trabalha no fuso do navegador, sem offset.
 function toDateTimeLocal(value: string) {
@@ -511,36 +514,134 @@ function EventForm({ initial, submitLabel, submittingLabel, onSubmit }: { initia
   const [name, setName] = useState(initial?.name ?? "");
   const [date, setDate] = useState(initial ? toDateTimeLocal(initial.date) : "");
   const [location, setLocation] = useState(initial?.location ?? "");
-  const [addressQuery, setAddressQuery] = useState("");
-  const [address, setAddress] = useState<MockAddress | null>(null);
+  const [coverUrl, setCoverUrl] = useState(initial?.coverUrl ?? "");
+  
+  const [cep, setCep] = useState("");
+  const [street, setStreet] = useState("");
+  const [number, setNumber] = useState("");
+  const [neighborhood, setNeighborhood] = useState("");
+  const [city, setCity] = useState("");
+  const [uf, setUf] = useState("");
+  
   const [capacity, setCapacity] = useState(initial ? String(initial.capacity) : "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  function searchAddress() {
-    const query = addressQuery.trim();
-    if (!query) { setError("Digite um endereço, bairro ou ponto de referência para buscar no mapa."); return; }
-    const selectedAddress = locateMockAddress(query);
-    setAddress(selectedAddress);
-    setLocation(selectedAddress.label);
+  const [uploading, setUploading] = useState(false);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
     setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("cover", file);
+      const result = await apiRequest<{ coverUrl: string }>("/api/admin/upload", {
+        method: "POST",
+        auth: "organizer",
+        body: formData,
+      }); 
+      setCoverUrl(result.coverUrl);
+    } catch (e) {
+      setError(messageFrom(e));
+    } finally {
+      setUploading(false);
+    }
   }
+
+  async function searchCEP() {
+    const cleanCep = cep.replace(/\D/g, "");
+    if (cleanCep.length !== 8) {
+      setError("Digite um CEP válido com 8 dígitos.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+      const data = await response.json();
+      if (data.erro) {
+        setError("CEP não encontrado.");
+        return;
+      }
+      setStreet(data.logradouro || "");
+      setNeighborhood(data.bairro || "");
+      setCity(data.localidade || "");
+      setUf(data.uf || "");
+      
+      const newLocation = `${data.logradouro || ""}, ${number}, ${data.bairro || ""} - ${data.localidade || ""}/${data.uf || ""}`.replace(/^, | , | - \//g, "").trim();
+      setLocation(newLocation);
+    } catch (e) {
+      setError("Erro ao buscar CEP.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (street || number || neighborhood || city || uf) {
+      const parts = [street, number].filter(Boolean).join(", ");
+      const locale = [neighborhood, city ? `${city}${uf ? `/${uf}` : ""}` : null].filter(Boolean).join(" - ");
+      const combined = [parts, locale].filter(Boolean).join(", ");
+      if (combined) setLocation(combined);
+    }
+  }, [street, number, neighborhood, city, uf]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const priceInCents = isPaid ? parseReais(price) : null;
     if (isPaid && (!priceInCents || priceInCents <= 0)) { setError("Informe um valor positivo em reais, por exemplo R$ 50,00."); return; }
     const parsedCapacity = Number(capacity);
     if (!Number.isInteger(parsedCapacity) || parsedCapacity < 1) { setError("Informe uma capacidade inteira maior que zero."); return; }
-    if (!location) { setError("Busque e confirme o local do evento no mapa."); return; }
+    if (!location) { setError("Preencha o local do evento."); return; }
     setLoading(true); setError(null);
     try {
-      await onSubmit({ name, date: new Date(date).toISOString(), location, capacity: parsedCapacity, isPaid, priceInCents });
+      await onSubmit({ name, date: new Date(date).toISOString(), location, capacity: parsedCapacity, isPaid, priceInCents, coverUrl: coverUrl || undefined });
     } catch (requestError) { setError(messageFrom(requestError)); } finally { setLoading(false); }
   }
+
   return <form className="form-card" onSubmit={submit}>
       <fieldset disabled={loading}><legend>Tipo de inscrição</legend><label><input type="radio" name="pricing" checked={!isPaid} onChange={() => setIsPaid(false)} /> Evento gratuito</label><label><input type="radio" name="pricing" checked={isPaid} onChange={() => setIsPaid(true)} /> Evento pago</label>{isPaid && <Field label="Valor da inscrição (R$)"><input inputMode="decimal" placeholder="R$ 50,00" required value={price} onChange={e => setPrice(e.target.value)} onBlur={() => { const cents = parseReais(price); if(cents !== null) setPrice(money(cents)); }} /></Field>}<p>Prévia: {isPaid ? money(parseReais(price) ?? 0) : "Gratuito"}</p></fieldset>
-      <div className="form-grid"><Field label="Nome do evento"><input disabled={loading} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Conecta Vale 2026" required value={name} /></Field><div className="location-picker"><span>Local do evento</span><div className="address-search"><input disabled={loading} onChange={(event) => setAddressQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchAddress(); } }} placeholder="Busque por rua, bairro ou ponto de referência" value={addressQuery} /><Button className="button-secondary" disabled={loading} onClick={searchAddress} type="button">Buscar no mapa</Button></div><div className="map-mock" role="img" aria-label="Mapa para localização do evento"><span className="map-status">{address ? `Marcador posicionado em ${address.label}.` : location ? `Local atual: ${location}. Busque um endereço para alterá-lo.` : "Busque um endereço para posicionar o marcador."}</span>{address ? <i className="map-marker" style={{ left: address.x, top: address.y }} /> : null}</div><div className="address-details"><Field label="Rua"><input readOnly value={address?.street ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Bairro"><input readOnly value={address?.neighborhood ?? ""} placeholder="Preenchido pela busca" /></Field><Field label="Cidade"><input readOnly value={address?.city ?? ""} placeholder="Preenchido pela busca" /></Field></div><Field label="Local confirmado"><input readOnly required value={location} placeholder="O local selecionado aparecerá aqui" /></Field></div><Field label="Data e horário"><input disabled={loading} onChange={(event) => setDate(event.target.value)} required type="datetime-local" value={date} /></Field><Field label="Capacidade máxima"><input disabled={loading} min="1" onChange={(event) => setCapacity(event.target.value)} placeholder="120" required step="1" type="number" value={capacity} /></Field></div>
+      <div className="form-grid">
+        <Field label="Nome do evento"><input disabled={loading} onChange={(event) => setName(event.target.value)} placeholder="Ex.: Conecta Vale 2026" required value={name} /></Field>
+        
+        <Field label="Capa do Evento (Imagem)">
+          <div style={{ display: "flex", gap: "1rem", alignItems: "center" }}>
+            {coverUrl ? <img src={coverUrl} alt="Capa" style={{ width: 80, height: 80, objectFit: "cover", borderRadius: 8 }} /> : null}
+            <input type="file" accept="image/*" ref={fileInputRef} style={{ display: "none" }} onChange={handleFileUpload} />
+            <Button className="button-secondary" type="button" disabled={uploading || loading} onClick={() => fileInputRef.current?.click()}>
+              {uploading ? "Enviando..." : "Anexar Imagem"}
+            </Button>
+            {coverUrl && <Button className="button-danger" type="button" onClick={() => setCoverUrl("")}>Remover</Button>}
+          </div>
+        </Field>
+
+        <div className="location-picker">
+          <span>Endereço (ViaCEP)</span>
+          <div className="address-search" style={{ marginBottom: "1rem" }}>
+            <input disabled={loading} onChange={(event) => setCep(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); searchCEP(); } }} placeholder="Digite o CEP (ex: 56300-000)" value={cep} maxLength={9} />
+            <Button className="button-secondary" disabled={loading} onClick={searchCEP} type="button">Buscar CEP</Button>
+          </div>
+          <div className="address-details">
+            <Field label="Rua"><input disabled={loading} value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Rua" /></Field>
+            <Field label="Número"><input disabled={loading} value={number} onChange={(e) => setNumber(e.target.value)} placeholder="Nº" /></Field>
+            <Field label="Bairro"><input disabled={loading} value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} placeholder="Bairro" /></Field>
+            <Field label="Cidade"><input disabled={loading} value={city} onChange={(e) => setCity(e.target.value)} placeholder="Cidade" /></Field>
+            <Field label="UF"><input disabled={loading} value={uf} onChange={(e) => setUf(e.target.value)} placeholder="UF" maxLength={2} style={{ textTransform: "uppercase" }} /></Field>
+          </div>
+          <Field label="Local completo (Editável)"><input required disabled={loading} value={location} onChange={(e) => setLocation(e.target.value)} placeholder="O endereço completo será formatado aqui" /></Field>
+        </div>
+
+        <Field label="Data e horário"><input disabled={loading} onChange={(event) => setDate(event.target.value)} required type="datetime-local" value={date} /></Field>
+        <Field label="Capacidade máxima"><input disabled={loading} min="1" onChange={(event) => setCapacity(event.target.value)} placeholder="120" required step="1" type="number" value={capacity} /></Field>
+      </div>
       {error ? <Alert>{error}</Alert> : null}
-      <footer className="form-actions"><Button className="button-secondary" onClick={() => navigate(initial ? `/admin/events/${initial.id}` : "/admin/events")} type="button">Cancelar</Button><Button className="button-primary" disabled={loading} type="submit">{loading ? submittingLabel : submitLabel}</Button></footer>
+      <footer className="form-actions">
+        <Button className="button-secondary" onClick={() => navigate(initial ? `/admin/events/${initial.id}` : "/admin/events")} type="button">Cancelar</Button>
+        <Button className="button-primary" disabled={loading || uploading} type="submit">{loading ? submittingLabel : submitLabel}</Button>
+      </footer>
     </form>;
 }
 

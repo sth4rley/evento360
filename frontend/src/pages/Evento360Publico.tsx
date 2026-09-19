@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { ApiError, apiRequest } from "../services/api";
+import { ApiError, apiRequest, getApiUrl } from "../services/api";
 import { AppIcon } from "../components/AppIcon";
 import { BrandLogo } from "../components/BrandLogo";
 
@@ -41,7 +41,13 @@ export function categoryForEvent(event: Pick<PublicCatalogEvent, "name">) {
   return categoryKeywords.find(([, keywords]) => keywords.some((keyword) => name.includes(normalized(keyword))))?.[0] ?? "Experiências";
 }
 
-export function imageForEvent(event: Pick<PublicCatalogEvent, "name">, index = 0) {
+export function imageForEvent(event: Pick<PublicCatalogEvent, "name"> & { coverUrl?: string | null }, index = 0) {
+  if (event.coverUrl) {
+    if (event.coverUrl.startsWith("/uploads/")) {
+      return getApiUrl(event.coverUrl);
+    }
+    return event.coverUrl;
+  }
   const category = categoryForEvent(event);
   if (category === "Gastronomia") return eventImages[1];
   if (category === "Cultura") return eventImages[2];

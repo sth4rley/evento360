@@ -57,6 +57,7 @@ model Event {
   name        String
   date        DateTime
   location    String
+  coverUrl    String?
   capacity    Int
   status      EventStatus   @default(DRAFT)
   publicId    String        @unique @default(cuid())

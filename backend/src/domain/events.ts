@@ -6,7 +6,16 @@ type CreateEventInput = {
   date: Date;
   location: string;
   capacity: number;
+  coverUrl?: string;
 };
+
+function optionalUrl(value: unknown, field: string): string | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || value.length > 500) {
+    throw new HttpError(400, "VALIDATION_ERROR", `${field} é inválido`);
+  }
+  return value.trim();
+}
 
 function requiredText(value: unknown, field: string): string {
   if (typeof value !== "string" || !value.trim() || value.trim().length > 300) {
@@ -61,6 +70,7 @@ export function parseCreateEventInput(body: unknown): CreateEventInput {
     date: validDate(input?.date),
     location: requiredText(input?.location, "Local"),
     capacity: positiveInteger(input?.capacity),
+    coverUrl: optionalUrl(input?.coverUrl, "Capa"),
   };
 }
 
@@ -79,6 +89,7 @@ export function serializeAdminEvent(event: Event) {
     name: event.name,
     date: event.date,
     location: event.location,
+    coverUrl: event.coverUrl,
     capacity: event.capacity,
     status: event.status,
     publicId: event.publicId,
