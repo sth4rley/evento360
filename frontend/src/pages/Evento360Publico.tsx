@@ -11,6 +11,7 @@ export type PublicCatalogEvent = {
   capacity: number;
   availableSeats: number;
   isFull: boolean;
+  coverUrl?: string | null;
 };
 
 type Evento360PublicoProps = {
