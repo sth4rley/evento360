@@ -11,6 +11,7 @@ import path from "node:path";
 
 export const app = express();
 
+app.use(cors({ origin: env.frontendUrl }));
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 app.set("trust proxy", 1);
@@ -20,7 +21,6 @@ app.use((_request, response, next) => {
   response.setHeader("Cache-Control", "no-store");
   next();
 });
-app.use(cors({ origin: env.frontendUrl }));
 app.use(createSecurityLimits());
 app.use(express.json({ limit: "100kb" }));
 app.use("/api/public", publicRouter);
