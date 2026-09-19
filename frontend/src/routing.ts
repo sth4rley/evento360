@@ -23,6 +23,8 @@ export type RouteId =
   | "admin-event-edit"
   | "admin-event-participants"
   | "admin-event-checkin"
+  | "payment"
+  | "admin-financial"
   | "not-found";
 
 export type RouteAccess = "public" | UserRole;
