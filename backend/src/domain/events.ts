@@ -7,6 +7,8 @@ type CreateEventInput = {
   location: string;
   capacity: number;
   coverUrl?: string;
+  isPaid: boolean;
+  priceInCents: number | null;
 };
 
 function optionalUrl(value: unknown, field: string): string | undefined {
@@ -71,6 +73,8 @@ export function parseCreateEventInput(body: unknown): CreateEventInput {
     location: requiredText(input?.location, "Local"),
     capacity: positiveInteger(input?.capacity),
     coverUrl: optionalUrl(input?.coverUrl, "Capa"),
+    isPaid: Boolean(input?.isPaid),
+    priceInCents: input?.priceInCents && typeof input.priceInCents === "number" ? input.priceInCents : null,
   };
 }
 
@@ -80,6 +84,8 @@ export function assertEventReadyForPublication(event: Event): void {
     date: event.date.toISOString(),
     location: event.location,
     capacity: event.capacity,
+    isPaid: event.isPaid,
+    priceInCents: event.priceInCents,
   });
 }
 
@@ -91,6 +97,8 @@ export function serializeAdminEvent(event: Event) {
     location: event.location,
     coverUrl: event.coverUrl,
     capacity: event.capacity,
+    isPaid: event.isPaid,
+    priceInCents: event.priceInCents,
     status: event.status,
     publicId: event.publicId,
     publishedAt: event.publishedAt,

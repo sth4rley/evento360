@@ -59,6 +59,8 @@ model Event {
   location    String
   coverUrl    String?
   capacity    Int
+  isPaid      Boolean       @default(false)
+  priceInCents Int?
   status      EventStatus   @default(DRAFT)
   publicId    String        @unique @default(cuid())
   registrations Registration[]

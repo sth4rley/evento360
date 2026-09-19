@@ -277,6 +277,8 @@ publicRouter.get("/events", async (_request, response, next) => {
         location: true,
         coverUrl: true,
         capacity: true,
+        isPaid: true,
+        priceInCents: true,
         _count: {
           select: { registrations: { where: { status: "ACTIVE" } } },
         },
@@ -302,6 +304,8 @@ publicRouter.get("/events/:publicId", async (request, response, next) => {
         location: true,
         coverUrl: true,
         capacity: true,
+        isPaid: true,
+        priceInCents: true,
         _count: {
           select: { registrations: { where: { status: "ACTIVE" } } },
         },

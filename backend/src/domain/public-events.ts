@@ -5,7 +5,7 @@ export function availableSeats(event: Pick<Event, "capacity">, activeRegistratio
 }
 
 export function serializePublicEvent(
-  event: Pick<Event, "publicId" | "name" | "date" | "location" | "capacity" | "coverUrl">,
+  event: Pick<Event, "publicId" | "name" | "date" | "location" | "capacity" | "coverUrl" | "isPaid" | "priceInCents">,
   activeRegistrations: number,
 ) {
   const available = availableSeats(event, activeRegistrations);
@@ -17,6 +17,8 @@ export function serializePublicEvent(
     location: event.location,
     coverUrl: event.coverUrl,
     capacity: event.capacity,
+    isPaid: event.isPaid,
+    priceInCents: event.priceInCents,
     availableSeats: available,
     isFull: available === 0,
   };
