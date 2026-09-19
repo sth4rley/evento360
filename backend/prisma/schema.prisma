@@ -64,6 +64,7 @@ model Event {
   status      EventStatus   @default(DRAFT)
   publicId    String        @unique @default(cuid())
   registrations Registration[]
+  payments    Payment[]
   createdAt   DateTime      @default(now())
   updatedAt   DateTime @updatedAt
   publishedAt DateTime?
@@ -88,10 +89,37 @@ model Registration {
   cancelledAt       DateTime?
   checkedInAt       DateTime?
   promotedAt        DateTime?
+  payment           Payment?
 
   @@index([eventId])
   @@index([participantId])
   @@index([status])
   @@index([eventId, participantEmail, status])
   @@index([eventId, status, createdAt])
+}
+
+model Payment {
+  id                String    @id @default(uuid()) @db.Uuid
+  eventId           String    @db.Uuid
+  event             Event     @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  registrationId    String?   @db.Uuid @unique
+  registration      Registration? @relation(fields: [registrationId], references: [id], onDelete: SetNull)
+  participantName   String
+  participantEmail  String
+  participantPhone  String?
+  amountInCents     Int
+  platformFeeInCents Int      @default(0)
+  method            String?
+  status            String    @default("PENDING")
+  installments      Int       @default(1)
+  cardLastFour      String?
+  externalReference String    @unique @default(cuid())
+  accessToken       String    @unique
+  waitlisted        Boolean   @default(false)
+  expiresAt         DateTime
+  createdAt         DateTime  @default(now())
+  paidAt            DateTime?
+  refundedAt        DateTime?
+
+  @@index([eventId])
 }
