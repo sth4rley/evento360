@@ -60,6 +60,13 @@ redirecionamento autorizado e use esse mesmo valor na variável. Em produção,
 utilize a URL HTTPS pública da API. Nunca exponha `GOOGLE_CLIENT_SECRET` no
 frontend.
 
+Quando a aplicação for executada com Docker Compose, coloque essas três
+variáveis no `.env` da raiz. O Compose as encaminha somente ao container do
+backend. Para a implantação atual do Evento360, use
+`https://event360-api.duckdns.org/api/public/auth/google/callback` como URI de
+redirecionamento, `https://evento360.duckdns.org` como `FRONTEND_URL` e
+`PUBLIC_APP_URL`, e `https://event360-api.duckdns.org` como `VITE_API_URL`.
+
 Participantes podem criar a conta na primeira entrada com Google. Para acesso
 de organizador, o e-mail Google precisa corresponder a um organizador já
 cadastrado; isso preserva a separação entre áreas públicas e administrativas.
