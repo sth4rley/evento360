@@ -498,3 +498,17 @@ adminRouter.post(
 adminRouter.get("/status", (_request, response) => {
   response.json({ status: "ok" });
 });
+
+// Rota financeira - retorna resumo vazio pois o módulo de pagamentos
+// (tabela Payment) ainda não foi implementado no banco de dados.
+adminRouter.get("/financial-summary", requireOrganizerAuth, (_request: any, response: any) => {
+  response.json({
+    summary: {
+      grossInCents: 0,
+      feeInCents: 0,
+      netInCents: 0,
+      counts: { APPROVED: 0, PENDING: 0, DECLINED: 0 },
+    },
+    payments: [],
+  });
+});

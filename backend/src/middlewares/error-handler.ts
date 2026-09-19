@@ -19,6 +19,7 @@ export const errorHandler: ErrorRequestHandler = (
   const message = knownError ? error.message : parserError ? "Corpo da requisição inválido ou muito grande" : "Erro interno do servidor";
 
   if (!knownError) {
+    console.error("Unhandled API Error:", error);
     request.app.get("logger")?.error?.({ code, statusCode });
   }
 

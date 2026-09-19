@@ -180,6 +180,15 @@ export function matchRoute(pathname: string): RouteMatch {
     });
   }
 
+  result = path.match(/^\/payment\/([^/]+)$/);
+  if (result) {
+    return matched("payment", "public", { token: decoded(result[1]) });
+  }
+
+  if (path === "/admin/financial") {
+    return matched("admin-financial", "ORGANIZER");
+  }
+
   return matched("not-found", "public");
 }
 
