@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response, type NextFunction } from "express";
 import { prisma } from "../../lib/prisma.js";
 import { HttpError } from "../../errors/http-error.js";
 import crypto from "node:crypto";
@@ -38,7 +38,7 @@ function serializePayment(payment: any) {
   };
 }
 
-paymentsRouter.post("/events/:publicId/payment-intents", optionalParticipantAuth, async (request, response, next) => {
+paymentsRouter.post("/events/:publicId/payment-intents", ...optionalParticipantAuth, async (request: any, response: any, next: any) => {
   try {
     const event = await prisma.event.findFirst({
       where: { publicId: request.params.publicId, status: "PUBLISHED" },
@@ -67,7 +67,7 @@ paymentsRouter.post("/events/:publicId/payment-intents", optionalParticipantAuth
   } catch (error) { next(error); }
 });
 
-paymentsRouter.get("/payments/:id", async (request, response, next) => {
+paymentsRouter.get("/payments/:id", async (request: any, response: any, next: any) => {
   try {
     const payment = await prisma.payment.findUnique({
       where: { id: request.params.id },
@@ -82,7 +82,7 @@ paymentsRouter.get("/payments/:id", async (request, response, next) => {
   } catch (error) { next(error); }
 });
 
-paymentsRouter.post("/payments/:id/process", async (request, response, next) => {
+paymentsRouter.post("/payments/:id/process", async (request: any, response: any, next: any) => {
   try {
     const payment = await prisma.payment.findUnique({
       where: { id: request.params.id },
